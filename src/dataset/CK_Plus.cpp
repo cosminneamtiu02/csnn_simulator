@@ -5,11 +5,17 @@
 #include <filesystem>
 #include <opencv2/opencv.hpp>
 #include <iomanip> // For std::setw and std::setfill
+#include <random>
+#include <algorithm>
 
 namespace dataset {
 
-CK_Plus::CK_Plus(const std::string& csv_path, const std::string& images_dir, int image_width, int image_height)
-    : m_csv_path(csv_path), m_images_dir(images_dir), m_image_width(image_width), m_image_height(image_height), m_data() {
+CK_Plus::CK_Plus(const std::string& csv_path, const std::string& images_dir, 
+                 int num_folds, unsigned int random_seed, 
+                 int image_width, int image_height)
+    : m_csv_path(csv_path), m_images_dir(images_dir), 
+      m_image_width(image_width), m_image_height(image_height),
+      m_num_folds(num_folds), m_random_seed(random_seed), m_data() {
 }
 
 CK_Plus::~CK_Plus() {
@@ -22,19 +28,20 @@ bool CK_Plus::load() {
         return false;
     }
 
+    // Temporary storage for all sequences before fold assignment
+    std::vector<ImageSequence> all_sequences;
+    
     std::string line;
     while (std::getline(file, line)) {
         std::stringstream ss(line);
-        std::string subject, ipostase_str, emotion_str, fold_str;
+        std::string subject, ipostase_str, emotion_str;
         
         std::getline(ss, subject, ',');
         std::getline(ss, ipostase_str, ',');
         std::getline(ss, emotion_str, ',');
-        std::getline(ss, fold_str, ',');
         
         int ipostase = std::stoi(ipostase_str);
         int emotion = std::stoi(emotion_str);
-        int fold = std::stoi(fold_str);
         
         // Create and populate the image sequence
         ImageSequence seq;
@@ -43,11 +50,45 @@ bool CK_Plus::load() {
         seq.emotion = emotion;
         seq.frames = loadImageSequence(subject, ipostase);
         
-        // Add to our data structure
-        m_data[fold][emotion].push_back(seq);
+        // Only add sequences that have frames
+        if (!seq.frames.empty()) {
+            all_sequences.push_back(seq);
+        }
     }
     
+    // Distribute sequences randomly but evenly across folds
+    distributeSequences(all_sequences);
+    
     return true;
+}
+
+void CK_Plus::distributeSequences(std::vector<ImageSequence>& sequences) {
+    // Clear existing data
+    m_data.clear();
+    
+    // Group sequences by emotion
+    std::map<int, std::vector<ImageSequence>> sequences_by_emotion;
+    for (auto& seq : sequences) {
+        sequences_by_emotion[seq.emotion].push_back(seq);
+    }
+    
+    // Seed random generator for reproducibility
+    std::mt19937 rng(m_random_seed);
+    
+    // For each emotion, randomly distribute sequences across folds
+    for (auto& [emotion, emotion_sequences] : sequences_by_emotion) {
+        // Shuffle sequences to randomize distribution
+        std::shuffle(emotion_sequences.begin(), emotion_sequences.end(), rng);
+        
+        // Distribute sequences evenly across folds
+        for (size_t i = 0; i < emotion_sequences.size(); i++) {
+            int fold = (i % m_num_folds) + 1; // Folds are 1-indexed
+            m_data[fold][emotion].push_back(emotion_sequences[i]);
+        }
+    }
+    
+    // Print distribution statistics
+    printEmotionDistribution();
 }
 
 std::vector<CK_Plus::ImageSequence> CK_Plus::getSequences(int fold, int emotion) {
@@ -221,9 +262,85 @@ std::shared_ptr<Tensor<float>> CK_Plus::sequenceToTensor(const ImageSequence& se
     return tensor;
 }
 
-// Remove the implementation of getEmotionName since it's causing issues
+std::string CK_Plus::getEmotionName(int emotion) const {
+    switch(emotion) {
+        case 1: return "Happy";
+        case 2: return "Fear";
+        case 3: return "Surprise";
+        case 4: return "Anger";
+        case 5: return "Disgust";
+        case 6: return "Sadness";
+        default: return "Unknown";
+    }
+}
 
-// Remove the implementation of printTensorInfo since it's causing issues
+std::map<int, std::map<int, int>> CK_Plus::getEmotionCounts() const {
+    std::map<int, std::map<int, int>> counts;
+    
+    // Initialize all counters to zero for all folds and emotions
+    for (int fold = 1; fold <= m_num_folds; fold++) {
+        for (int emotion = 1; emotion <= getNumEmotions(); emotion++) {
+            counts[fold][emotion] = 0;
+        }
+    }
+    
+    // Count sequences for each emotion in each fold
+    for (const auto& [fold, emotions] : m_data) {
+        for (const auto& [emotion, sequences] : emotions) {
+            counts[fold][emotion] = sequences.size();
+        }
+    }
+    
+    return counts;
+}
+
+void CK_Plus::printEmotionDistribution() const {
+    auto counts = getEmotionCounts();
+    
+    // Calculate totals
+    std::map<int, int> emotion_totals;
+    std::map<int, int> fold_totals;
+    int grand_total = 0;
+    
+    for (int fold = 1; fold <= m_num_folds; fold++) {
+        for (int emotion = 1; emotion <= getNumEmotions(); emotion++) {
+            int count = counts[fold][emotion];
+            emotion_totals[emotion] += count;
+            fold_totals[fold] += count;
+            grand_total += count;
+        }
+    }
+    
+    // Print header
+    std::cout << "Emotion Distribution Across Folds:" << std::endl;
+    std::cout << std::setw(10) << "Fold";
+    for (int emotion = 1; emotion <= getNumEmotions(); emotion++) {
+        std::cout << " | " << std::setw(8) << getEmotionName(emotion);
+    }
+    std::cout << " | " << std::setw(8) << "Total" << std::endl;
+    
+    // Print separator
+    std::cout << std::string(10 + (getNumEmotions() + 1) * 11, '-') << std::endl;
+    
+    // Print counts for each fold
+    for (int fold = 1; fold <= m_num_folds; fold++) {
+        std::cout << std::setw(10) << fold;
+        for (int emotion = 1; emotion <= getNumEmotions(); emotion++) {
+            std::cout << " | " << std::setw(8) << counts.at(fold).at(emotion);
+        }
+        std::cout << " | " << std::setw(8) << fold_totals[fold] << std::endl;
+    }
+    
+    // Print separator
+    std::cout << std::string(10 + (getNumEmotions() + 1) * 11, '-') << std::endl;
+    
+    // Print totals
+    std::cout << std::setw(10) << "Total";
+    for (int emotion = 1; emotion <= getNumEmotions(); emotion++) {
+        std::cout << " | " << std::setw(8) << emotion_totals[emotion];
+    }
+    std::cout << " | " << std::setw(8) << grand_total << std::endl;
+}
 
 std::shared_ptr<Input> CK_Plus::sequenceToInput(const ImageSequence& seq) {
     // Suppress unused parameter warning

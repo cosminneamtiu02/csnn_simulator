@@ -21,7 +21,9 @@ public:
         std::vector<std::shared_ptr<Tensor<float>>> frames;
     };
 
-    CK_Plus(const std::string& csv_path, const std::string& images_dir, int image_width = 48, int image_height = 48);
+    CK_Plus(const std::string& csv_path, const std::string& images_dir, 
+            int num_folds = 10, unsigned int random_seed = 42, 
+            int image_width = 48, int image_height = 48);
     ~CK_Plus();
 
     // Load the dataset from CSV and images
@@ -40,22 +42,29 @@ public:
     int getNumEmotions() const { return 6; }
 
     // Get number of folds
-    int getNumFolds() const { return 10; }
+    int getNumFolds() const { return m_num_folds; }
+    
+    // Get counts of emotions per fold
+    std::map<int, std::map<int, int>> getEmotionCounts() const;
+    
+    // Get emotion name from emotion ID
+    std::string getEmotionName(int emotion) const;
 
     // Convert ImageSequence to Tensor or Spike input
     std::shared_ptr<Tensor<float>> sequenceToTensor(const ImageSequence& seq);
     std::shared_ptr<Input> sequenceToInput(const ImageSequence& seq);
     std::shared_ptr<Spike> sequenceToSpike(const ImageSequence& seq);
 
-    // Helper functions for tensor-emotion verification
-    std::string getEmotionName(int emotion) const;
-    void printTensorInfo(const std::shared_ptr<Tensor<float>>& tensor);
+    // Print emotion distribution across folds
+    void printEmotionDistribution() const;
 
 private:
     std::string m_csv_path;
     std::string m_images_dir;
     int m_image_width;
     int m_image_height;
+    int m_num_folds;
+    unsigned int m_random_seed;
     
     // Data structure: fold -> emotion -> sequences
     std::map<int, std::map<int, std::vector<ImageSequence>>> m_data;
@@ -65,6 +74,9 @@ private:
     
     // Load a sequence of images for a subject/ipostase
     std::vector<std::shared_ptr<Tensor<float>>> loadImageSequence(const std::string& subject, int ipostase);
+    
+    // Distribute sequences evenly across folds
+    void distributeSequences(std::vector<ImageSequence>& sequences);
 };
 
 } // namespace dataset
