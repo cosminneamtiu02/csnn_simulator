@@ -10,6 +10,13 @@
 
 namespace dataset {
 
+// Initialize static log level (0=none, 1=minimal, 2=verbose)
+static const int LOG_LEVEL = 1;
+
+// Helper macro for conditional logging
+#define LOG_INFO(level, message) if (LOG_LEVEL >= level) { std::cout << message; }
+#define LOG_ERROR(message) std::cerr << message;
+
 CK_Plus::CK_Plus(const std::string& csv_path, const std::string& images_dir, 
                  int num_folds, unsigned int random_seed, 
                  int image_width, int image_height)
@@ -24,14 +31,15 @@ CK_Plus::~CK_Plus() {
 bool CK_Plus::load() {
     std::ifstream file(m_csv_path);
     if (!file.is_open()) {
-        std::cerr << "Failed to open CSV file: " << m_csv_path << std::endl;
+        LOG_ERROR("Failed to open CSV file: " << m_csv_path << std::endl);
         return false;
     }
 
-    // Temporary storage for all sequences before fold assignment
+    LOG_INFO(1, "Loading dataset from " << m_csv_path << std::endl);
     std::vector<ImageSequence> all_sequences;
     
     std::string line;
+    int line_count = 0;
     while (std::getline(file, line)) {
         std::stringstream ss(line);
         std::string subject, ipostase_str, emotion_str;
@@ -40,26 +48,40 @@ bool CK_Plus::load() {
         std::getline(ss, ipostase_str, ',');
         std::getline(ss, emotion_str, ',');
         
-        int ipostase = std::stoi(ipostase_str);
-        int emotion = std::stoi(emotion_str);
-        
-        // Create and populate the image sequence
-        ImageSequence seq;
-        seq.subject = subject;
-        seq.ipostase = ipostase;
-        seq.emotion = emotion;
-        seq.frames = loadImageSequence(subject, ipostase);
-        
-        // Only add sequences that have frames
-        if (!seq.frames.empty()) {
-            all_sequences.push_back(seq);
+        try {
+            int ipostase = std::stoi(ipostase_str);
+            int emotion = std::stoi(emotion_str);
+            
+            // Create and populate the image sequence
+            ImageSequence seq;
+            seq.subject = subject;
+            seq.ipostase = ipostase;
+            seq.emotion = emotion;
+            
+            // Use verbosity level 2 for detailed image loading logs
+            seq.frames = loadImageSequence(subject, ipostase, LOG_LEVEL >= 2);
+            
+            // Only add sequences that have frames
+            if (!seq.frames.empty()) {
+                all_sequences.push_back(seq);
+                LOG_INFO(1, "Added sequence: Subject=" << subject 
+                           << ", Ipostase=" << ipostase 
+                           << ", Emotion=" << emotion
+                           << ", Frames=" << seq.frames.size() << std::endl);
+            }
+        } catch (const std::exception& e) {
+            LOG_ERROR("Error processing line " << line_count << ": " << e.what() << std::endl);
         }
+        
+        line_count++;
     }
+    
+    LOG_INFO(1, "Loaded " << all_sequences.size() << " valid sequences" << std::endl);
     
     // Distribute sequences randomly but evenly across folds
     distributeSequences(all_sequences);
     
-    return true;
+    return !all_sequences.empty();
 }
 
 void CK_Plus::distributeSequences(std::vector<ImageSequence>& sequences) {
@@ -88,7 +110,9 @@ void CK_Plus::distributeSequences(std::vector<ImageSequence>& sequences) {
     }
     
     // Print distribution statistics
-    printEmotionDistribution();
+    if (LOG_LEVEL >= 1) {
+        printEmotionDistribution();
+    }
 }
 
 std::vector<CK_Plus::ImageSequence> CK_Plus::getSequences(int fold, int emotion) {
@@ -124,12 +148,14 @@ std::vector<CK_Plus::ImageSequence> CK_Plus::getTestSequences(int test_fold) {
     return test_sequences;
 }
 
-std::shared_ptr<Tensor<float>> CK_Plus::loadImage(const std::string& path) {
-    std::cout << "Loading image: " << path << std::endl;
+std::shared_ptr<Tensor<float>> CK_Plus::loadImage(const std::string& path, bool verbose) {
+    if (verbose) {
+        LOG_INFO(2, "Loading image: " << path << std::endl);
+    }
     
     cv::Mat image = cv::imread(path, cv::IMREAD_GRAYSCALE);
     if (image.empty()) {
-        std::cerr << "Failed to load image: " << path << std::endl;
+        LOG_ERROR("Failed to load image: " << path << std::endl);
         return nullptr;
     }
     
@@ -155,13 +181,15 @@ std::shared_ptr<Tensor<float>> CK_Plus::loadImage(const std::string& path) {
         }
     }
     
-    std::cout << "  → Created 2D tensor [" << m_image_height << "×" << m_image_width 
-              << "] from image: " << std::filesystem::path(path).filename().string() << std::endl;
+    if (verbose) {
+        LOG_INFO(2, "  → Created 2D tensor [" << m_image_height << "×" << m_image_width 
+                << "] from image: " << std::filesystem::path(path).filename().string() << std::endl);
+    }
     
     return tensor;
 }
 
-std::vector<std::shared_ptr<Tensor<float>>> CK_Plus::loadImageSequence(const std::string& subject, int ipostase) {
+std::vector<std::shared_ptr<Tensor<float>>> CK_Plus::loadImageSequence(const std::string& subject, int ipostase, bool verbose) {
     std::vector<std::shared_ptr<Tensor<float>>> frames;
     
     // Format ipostase with leading zeros (3-digit format: 000, 001, etc.)
@@ -172,7 +200,9 @@ std::vector<std::shared_ptr<Tensor<float>>> CK_Plus::loadImageSequence(const std
     // Construct the directory path for this subject and ipostase with zero-padded folder name
     std::string subject_dir = m_images_dir + "/" + subject + "/" + ipostase_str;
     
-    std::cout << "Loading sequence from: " << subject_dir << std::endl;
+    if (verbose) {
+        LOG_INFO(2, "Loading sequence from: " << subject_dir << std::endl);
+    }
     
     try {
         // Collect all image paths first and sort them
@@ -190,19 +220,23 @@ std::vector<std::shared_ptr<Tensor<float>>> CK_Plus::loadImageSequence(const std
         
         // Now load images in sorted order
         for (size_t i = 0; i < image_paths.size(); i++) {
-            auto frame = loadImage(image_paths[i].string());
+            auto frame = loadImage(image_paths[i].string(), verbose);
             if (frame) {
                 frames.push_back(frame);
-                std::cout << "  Frame " << i << ": " << image_paths[i].filename().string() << std::endl;
+                if (verbose) {
+                    LOG_INFO(2, "  Frame " << i << ": " << image_paths[i].filename().string() << std::endl);
+                }
             }
         }
     }
     catch (const std::exception& e) {
-        std::cerr << "Error loading image sequence: " << e.what() << " [" << subject_dir << "]" << std::endl;
+        LOG_ERROR("Error loading image sequence: " << e.what() << " [" << subject_dir << "]" << std::endl);
     }
     
-    std::cout << "Loaded " << frames.size() << " frames for subject " << subject 
-              << ", ipostase " << ipostase << std::endl;
+    if (verbose || frames.empty()) {
+        LOG_INFO(1, "Loaded " << frames.size() << " frames for subject " << subject 
+               << ", ipostase " << ipostase << std::endl);
+    }
     
     return frames;
 }
@@ -228,10 +262,10 @@ std::shared_ptr<Tensor<float>> CK_Plus::sequenceToTensor(const ImageSequence& se
         default: emotion_name = "Unknown"; break;
     }
     
-    std::cout << "Converting sequence to 3D tensor: Subject=" << seq.subject 
+    LOG_INFO(1, "Converting sequence to 3D tensor: Subject=" << seq.subject 
               << ", Ipostase=" << seq.ipostase 
               << ", Emotion=" << seq.emotion << " (" << emotion_name << ")"
-              << ", Frames=" << depth << std::endl;
+              << ", Frames=" << depth << std::endl);
     
     // Create a 3D tensor using Shape
     std::vector<size_t> dims = {static_cast<size_t>(height), 
@@ -253,11 +287,11 @@ std::shared_ptr<Tensor<float>> CK_Plus::sequenceToTensor(const ImageSequence& se
             }
         }
         
-        std::cout << "  Added frame " << z << " to tensor at depth position " << z << std::endl;
+        LOG_INFO(2, "  Added frame " << z << " to tensor at depth position " << z << std::endl);
     }
     
-    std::cout << "Created 3D tensor for emotion " << emotion_name 
-              << " with dimensions [" << height << "×" << width << "×" << depth << "×1]" << std::endl;
+    LOG_INFO(2, "Created 3D tensor for emotion " << emotion_name 
+              << " with dimensions [" << height << "×" << width << "×" << depth << "×1]" << std::endl);
     
     return tensor;
 }
@@ -342,15 +376,6 @@ void CK_Plus::printEmotionDistribution() const {
     std::cout << " | " << std::setw(8) << grand_total << std::endl;
 }
 
-std::shared_ptr<Input> CK_Plus::sequenceToInput(const ImageSequence& seq) {
-    // Suppress unused parameter warning
-    (void)seq;
-    
-    // Since Input is an abstract class, we need a concrete implementation
-    // For now, return nullptr until you implement a concrete Input class
-    return nullptr;
-}
-
 std::shared_ptr<Spike> CK_Plus::sequenceToSpike(const ImageSequence& seq) {
     // Suppress unused parameter warning
     (void)seq;
@@ -374,8 +399,9 @@ CK_Plus_Input::CK_Plus_Input(const CK_Plus::ImageSequence& sequence, int image_w
     // Validation moved to a separate method
     validateSequence();
     
-    std::cout << "Creating shape with dimensions: " 
-              << _shape.dim(0) << "×" << _shape.dim(1) << "×" << _shape.dim(2) << "×" << _shape.dim(3) << std::endl;
+    LOG_INFO(2, "Created CK+ input with shape: " 
+             << _shape.dim(0) << "×" << _shape.dim(1) << "×" 
+             << _shape.dim(2) << "×" << _shape.dim(3) << std::endl);
 }
 
 CK_Plus_Input::~CK_Plus_Input() {}
@@ -390,28 +416,23 @@ bool CK_Plus_Input::has_next() const {
 
 std::pair<std::string, Tensor<float>> CK_Plus_Input::next() {
     if (!has_next()) {
-        throw std::runtime_error("No more data");
+        throw std::runtime_error("No more data in CK_Plus_Input");
     }
-    
-    // Debug output to check dimensions
-    std::cout << "Creating tensor with shape: " << _shape.to_string() << std::endl;
-    std::cout << "Frames count: " << _sequence.frames.size() << std::endl;
     
     try {
         Tensor<float> result(_shape);
         
-        // Convert sequence frames to tensor
+        // Copy frame data to tensor
         for (size_t z = 0; z < _sequence.frames.size(); z++) {
             auto& frame = _sequence.frames[z];
             if (!frame) {
-                std::cerr << "Warning: Null frame at position " << z << std::endl;
-                continue; // Skip null frames
+                LOG_ERROR("Warning: Null frame at position " << z << std::endl);
+                continue;
             }
             
             for (int y = 0; y < _height; y++) {
                 for (int x = 0; x < _width; x++) {
-                    float value = frame->at(y, x, 0, 0);
-                    result.at(y, x, z, 0) = value;
+                    result.at(y, x, z, 0) = frame->at(y, x, 0, 0);
                 }
             }
         }
@@ -420,7 +441,7 @@ std::pair<std::string, Tensor<float>> CK_Plus_Input::next() {
         return std::make_pair(_label, result);
     }
     catch (const std::exception& e) {
-        std::cerr << "Error creating tensor: " << e.what() << std::endl;
+        LOG_ERROR("Error creating tensor: " << e.what() << std::endl);
         throw;
     }
 }
@@ -434,7 +455,8 @@ void CK_Plus_Input::close() {
 }
 
 std::string CK_Plus_Input::to_string() const {
-    return "CkPlusInput: " + _label + ", frames: " + std::to_string(_sequence.frames.size());
+    return "CkPlusInput: Emotion=" + _label + 
+           ", Frames=" + std::to_string(_sequence.frames.size());
 }
 
 // Factory method to create input from sequence

@@ -4,21 +4,32 @@
 #include <vector>
 #include <map>
 #include <memory>
-#include <tuple>
 #include "Input.h"
 #include "Tensor.h"
 #include "Spike.h"
 
 namespace dataset {
 
+// Forward declaration
+class CK_Plus_Input;
+
 class CK_Plus {
 public:
     struct ImageSequence {
-        ImageSequence() : subject(""), ipostase(0), emotion(0), frames() {}
-        std::string subject;
-        int ipostase;
-        int emotion;
+        std::string subject = "";
+        int ipostase = 0;
+        int emotion = 0;
         std::vector<std::shared_ptr<Tensor<float>>> frames;
+    };
+    
+    // Emotion mapping constants
+    enum Emotion {
+        HAPPY = 1,
+        FEAR = 2,
+        SURPRISE = 3,
+        ANGER = 4,
+        DISGUST = 5,
+        SADNESS = 6
     };
     
     CK_Plus(const std::string& csv_path, const std::string& images_dir, 
@@ -26,42 +37,26 @@ public:
             int image_width = 48, int image_height = 48);
     ~CK_Plus();
 
-    // Load the dataset from CSV and images
+    // Core dataset functions
     bool load();
-
-    // Get all sequences for a specific fold and emotion
     std::vector<ImageSequence> getSequences(int fold, int emotion);
-
-    // Get all sequences for training (all folds except test_fold)
     std::vector<ImageSequence> getTrainingSequences(int test_fold);
-
-    // Get all sequences for testing (only test_fold)
     std::vector<ImageSequence> getTestSequences(int test_fold);
-
-    // Get number of emotions
+    
+    // Helper functions
     int getNumEmotions() const { return 6; }
-
-    // Get number of folds
     int getNumFolds() const { return m_num_folds; }
-    
-    // Get counts of emotions per fold
     std::map<int, std::map<int, int>> getEmotionCounts() const;
-    
-    // Get emotion name from emotion ID
     std::string getEmotionName(int emotion) const;
-
-    // Convert ImageSequence to Tensor or Spike input
-    std::shared_ptr<Tensor<float>> sequenceToTensor(const ImageSequence& seq);
-    std::shared_ptr<Input> sequenceToInput(const ImageSequence& seq);
-    std::shared_ptr<Spike> sequenceToSpike(const ImageSequence& seq);
-
-    // Print emotion distribution across folds
     void printEmotionDistribution() const;
-
-    // Create an Input object from a sequence
+    
+    // Data conversion functions
+    std::shared_ptr<Tensor<float>> sequenceToTensor(const ImageSequence& seq);
     std::shared_ptr<Input> createInput(const ImageSequence& seq);
+    std::shared_ptr<Spike> sequenceToSpike(const ImageSequence& seq); // Placeholder
 
 private:
+    // Configuration
     std::string m_csv_path;
     std::string m_images_dir;
     int m_image_width;
@@ -72,23 +67,20 @@ private:
     // Data structure: fold -> emotion -> sequences
     std::map<int, std::map<int, std::vector<ImageSequence>>> m_data;
 
-    // Load a single image and convert to Tensor
-    std::shared_ptr<Tensor<float>> loadImage(const std::string& path);
-    
-    // Load a sequence of images for a subject/ipostase
-    std::vector<std::shared_ptr<Tensor<float>>> loadImageSequence(const std::string& subject, int ipostase);
-    
-    // Distribute sequences evenly across folds
+    // Internal helper methods
+    std::shared_ptr<Tensor<float>> loadImage(const std::string& path, bool verbose = false);
+    std::vector<std::shared_ptr<Tensor<float>>> loadImageSequence(
+        const std::string& subject, int ipostase, bool verbose = false);
     void distributeSequences(std::vector<ImageSequence>& sequences);
 };
 
-// Define CkPlusInput as a standalone class in the dataset namespace
+// Standalone input class for CK+ dataset
 class CK_Plus_Input : public Input {
 public:
     CK_Plus_Input(const CK_Plus::ImageSequence& sequence, int image_width, int image_height);
     virtual ~CK_Plus_Input();
 
-    // Implement required Input interface methods
+    // Implementation of Input interface
     virtual const Shape& shape() const override;
     virtual bool has_next() const override;
     virtual std::pair<std::string, Tensor<float>> next() override;
@@ -97,7 +89,6 @@ public:
     virtual std::string to_string() const override;
 
 private:
-    // Helper methods for constructor
     static Shape createShape(const CK_Plus::ImageSequence& sequence, int width, int height);
     void validateSequence();
     
