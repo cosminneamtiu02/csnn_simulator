@@ -360,4 +360,109 @@ std::shared_ptr<Spike> CK_Plus::sequenceToSpike(const ImageSequence& seq) {
     return nullptr;
 }
 
+// Implementation of CkPlusInput class
+CK_Plus_Input::CK_Plus_Input(const CK_Plus::ImageSequence& sequence, int image_width, int image_height) 
+    : Input(), 
+      _sequence(sequence), 
+      _width(image_width), 
+      _height(image_height), 
+      _label(std::to_string(_sequence.emotion)), 
+      _class_name(std::to_string(_sequence.emotion)),
+      _current_index(0),
+      _shape(createShape(sequence, image_width, image_height)) {
+    
+    // Validation moved to a separate method
+    validateSequence();
+    
+    std::cout << "Creating shape with dimensions: " 
+              << _shape.dim(0) << "×" << _shape.dim(1) << "×" << _shape.dim(2) << "×" << _shape.dim(3) << std::endl;
+}
+
+CK_Plus_Input::~CK_Plus_Input() {}
+
+const Shape& CK_Plus_Input::shape() const {
+    return _shape;
+}
+
+bool CK_Plus_Input::has_next() const {
+    return _current_index < 1; // Only one item per sequence
+}
+
+std::pair<std::string, Tensor<float>> CK_Plus_Input::next() {
+    if (!has_next()) {
+        throw std::runtime_error("No more data");
+    }
+    
+    // Debug output to check dimensions
+    std::cout << "Creating tensor with shape: " << _shape.to_string() << std::endl;
+    std::cout << "Frames count: " << _sequence.frames.size() << std::endl;
+    
+    try {
+        Tensor<float> result(_shape);
+        
+        // Convert sequence frames to tensor
+        for (size_t z = 0; z < _sequence.frames.size(); z++) {
+            auto& frame = _sequence.frames[z];
+            if (!frame) {
+                std::cerr << "Warning: Null frame at position " << z << std::endl;
+                continue; // Skip null frames
+            }
+            
+            for (int y = 0; y < _height; y++) {
+                for (int x = 0; x < _width; x++) {
+                    float value = frame->at(y, x, 0, 0);
+                    result.at(y, x, z, 0) = value;
+                }
+            }
+        }
+        
+        _current_index++;
+        return std::make_pair(_label, result);
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error creating tensor: " << e.what() << std::endl;
+        throw;
+    }
+}
+
+void CK_Plus_Input::reset() {
+    _current_index = 0;
+}
+
+void CK_Plus_Input::close() {
+    // Nothing to close
+}
+
+std::string CK_Plus_Input::to_string() const {
+    return "CkPlusInput: " + _label + ", frames: " + std::to_string(_sequence.frames.size());
+}
+
+// Factory method to create input from sequence
+std::shared_ptr<Input> CK_Plus::createInput(const ImageSequence& seq) {
+    return std::make_shared<CK_Plus_Input>(seq, m_image_width, m_image_height);
+}
+
+Shape CK_Plus_Input::createShape(const CK_Plus::ImageSequence& sequence, int width, int height) {
+    // Initialize shape with explicit size_t values to avoid unexpected conversions
+    size_t h = static_cast<size_t>(height);
+    size_t w = static_cast<size_t>(width);
+    size_t d = sequence.frames.empty() ? 1 : static_cast<size_t>(sequence.frames.size());
+    size_t c = 1; // channels
+    
+    return Shape({h, w, d, c});
+}
+
+void CK_Plus_Input::validateSequence() {
+    // Verify that we have valid dimensions and non-empty frames
+    if (_sequence.frames.empty()) {
+        throw std::runtime_error("Sequence has no frames");
+    }
+    
+    // Make sure all dimensions are valid (non-zero)
+    if (_width <= 0 || _height <= 0) {
+        throw std::runtime_error("Invalid dimensions: width=" + std::to_string(_width) + 
+                                ", height=" + std::to_string(_height));
+    }
+}
+
 } // namespace dataset

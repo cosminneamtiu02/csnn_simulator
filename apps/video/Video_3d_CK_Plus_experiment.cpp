@@ -21,105 +21,6 @@
 #include "process/SeparateSign.h"
 #include "process/MaxScaling.h"
 
-
-class CkPlusInput : public Input {
-public:
-    CkPlusInput(const dataset::CK_Plus::ImageSequence& sequence, int image_width, int image_height) 
-        : Input(), _sequence(sequence), _width(image_width), _height(image_height), 
-          _label(std::to_string(_sequence.emotion)), _class_name(std::to_string(_sequence.emotion)),
-          _current_index(0) {
-        
-        // Verify that we have valid dimensions and non-empty frames
-        if (_sequence.frames.empty()) {
-            throw std::runtime_error("Sequence has no frames");
-        }
-        
-        // Make sure all dimensions are valid (non-zero)
-        if (_width <= 0 || _height <= 0) {
-            throw std::runtime_error("Invalid dimensions: width=" + std::to_string(_width) + 
-                                    ", height=" + std::to_string(_height));
-        }
-        
-        // Initialize shape with explicit size_t values to avoid unexpected conversions
-        size_t h = static_cast<size_t>(_height);
-        size_t w = static_cast<size_t>(_width);
-        size_t d = static_cast<size_t>(_sequence.frames.size());
-        size_t c = 1; // channels
-        
-        std::cout << "Creating shape with dimensions: " << h << "×" << w << "×" << d << "×" << c << std::endl;
-        _shape = Shape({h, w, d, c});
-    }
-
-    virtual ~CkPlusInput() {}
-
-    virtual const Shape& shape() const override {
-        return _shape;
-    }
-
-    // Implementation of required abstract methods from Input base class
-    virtual bool has_next() const override {
-        return _current_index < 1; // Only one item per sequence
-    }
-    
-    virtual std::pair<std::string, Tensor<float>> next() override {
-        if (!has_next()) {
-            throw std::runtime_error("No more data");
-        }
-        
-        // Debug output to check dimensions
-        std::cout << "Creating tensor with shape: " << _shape.to_string() << std::endl;
-        std::cout << "Frames count: " << _sequence.frames.size() << std::endl;
-        
-        try {
-            Tensor<float> result(_shape);
-            
-            // Convert sequence frames to tensor
-            for (size_t z = 0; z < _sequence.frames.size(); z++) {
-                auto& frame = _sequence.frames[z];
-                if (!frame) {
-                    std::cerr << "Warning: Null frame at position " << z << std::endl;
-                    continue; // Skip null frames
-                }
-                
-                for (int y = 0; y < _height; y++) {
-                    for (int x = 0; x < _width; x++) {
-                        float value = frame->at(y, x, 0, 0);
-                        result.at(y, x, z, 0) = value;
-                    }
-                }
-            }
-            
-            _current_index++;
-            return std::make_pair(_label, result);
-        }
-        catch (const std::exception& e) {
-            std::cerr << "Error creating tensor: " << e.what() << std::endl;
-            throw;
-        }
-    }
-    
-    virtual void reset() override {
-        _current_index = 0;
-    }
-    
-    virtual void close() override {
-        // Nothing to close
-    }
-
-    virtual std::string to_string() const override {
-        return "CkPlusInput: " + _label + ", frames: " + std::to_string(_sequence.frames.size());
-    }
-
-private:
-    dataset::CK_Plus::ImageSequence _sequence;
-    int _width;
-    int _height;
-    std::string _label;
-    std::string _class_name;
-    size_t _current_index;
-    Shape _shape;
-};
-
 int main(int argc, char **argv)
 {
     // Parse command line arguments
@@ -188,7 +89,8 @@ int main(int argc, char **argv)
                 }
                 
                 try {
-                    experiment.add_train<CkPlusInput>(seq, _frame_size_width, _frame_size_height);
+                    // Use the CK_Plus_Input class instead of the nested class
+                    experiment.add_train<dataset::CK_Plus_Input>(seq, _frame_size_width, _frame_size_height);
                     training_count++;
                 } catch (const std::exception& e) {
                     experiment.log() << "Error adding training sequence: " << e.what() << std::endl;
@@ -204,7 +106,8 @@ int main(int argc, char **argv)
                 }
                 
                 try {
-                    experiment.add_test<CkPlusInput>(seq, _frame_size_width, _frame_size_height);
+                    // Use the CK_Plus_Input class instead of the nested class
+                    experiment.add_test<dataset::CK_Plus_Input>(seq, _frame_size_width, _frame_size_height);
                     testing_count++;
                 } catch (const std::exception& e) {
                     experiment.log() << "Error adding testing sequence: " << e.what() << std::endl;

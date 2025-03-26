@@ -20,7 +20,7 @@ public:
         int emotion;
         std::vector<std::shared_ptr<Tensor<float>>> frames;
     };
-
+    
     CK_Plus(const std::string& csv_path, const std::string& images_dir, 
             int num_folds = 10, unsigned int random_seed = 42, 
             int image_width = 48, int image_height = 48);
@@ -58,6 +58,9 @@ public:
     // Print emotion distribution across folds
     void printEmotionDistribution() const;
 
+    // Create an Input object from a sequence
+    std::shared_ptr<Input> createInput(const ImageSequence& seq);
+
 private:
     std::string m_csv_path;
     std::string m_images_dir;
@@ -77,6 +80,34 @@ private:
     
     // Distribute sequences evenly across folds
     void distributeSequences(std::vector<ImageSequence>& sequences);
+};
+
+// Define CkPlusInput as a standalone class in the dataset namespace
+class CK_Plus_Input : public Input {
+public:
+    CK_Plus_Input(const CK_Plus::ImageSequence& sequence, int image_width, int image_height);
+    virtual ~CK_Plus_Input();
+
+    // Implement required Input interface methods
+    virtual const Shape& shape() const override;
+    virtual bool has_next() const override;
+    virtual std::pair<std::string, Tensor<float>> next() override;
+    virtual void reset() override;
+    virtual void close() override;
+    virtual std::string to_string() const override;
+
+private:
+    // Helper methods for constructor
+    static Shape createShape(const CK_Plus::ImageSequence& sequence, int width, int height);
+    void validateSequence();
+    
+    CK_Plus::ImageSequence _sequence;
+    int _width;
+    int _height;
+    std::string _label;
+    std::string _class_name;
+    size_t _current_index;
+    Shape _shape;
 };
 
 } // namespace dataset
