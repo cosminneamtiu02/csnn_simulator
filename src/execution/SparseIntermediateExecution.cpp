@@ -40,31 +40,104 @@ void SparseIntermediateExecution::process(size_t refresh_interval) {
 }
 
 Tensor<Time> SparseIntermediateExecution::compute_time_at(size_t i) const {
-	throw std::runtime_error("Unimplemented");
+    (void)i; // Suppress unused parameter warning
+    throw std::runtime_error("Unimplemented");
 }
 
 void SparseIntermediateExecution::_load_data() {
-	for(Input* input : _experiment.train_data()) {
-		size_t count = 0;
-		while(input->has_next()) {
-			auto entry = input->next();
-			_train_set.emplace_back(entry.first, to_sparse_tensor(entry.second));
-			count ++;
-		}
-		_experiment.log() << "Load " << count << " train samples from " << input->to_string() << std::endl;
-		input->close();
-	}
+    std::cout << "\n========== TESTING DATA LOADING ==========\n";
+    std::cout << "Training data sources: " << _experiment.train_data().size() << std::endl;
+    std::cout << "Testing data sources: " << _experiment.test_data().size() << std::endl;
 
-	for(Input* input : _experiment.test_data()) {
-		size_t count = 0;
-		while(input->has_next()) {
-			auto entry = input->next();
-			_test_set.emplace_back(entry.first, to_sparse_tensor(entry.second));
-			count ++;
-		}
-		_experiment.log() << "Load " << count << " test samples from " << input->to_string() << std::endl;
-		input->close();
-	}
+    _train_set.clear();
+    _test_set.clear();
+    
+    // Load training data
+    for(Input* input : _experiment.train_data()) {
+        size_t count = 0;
+        std::cout << "Processing training input: " << input->to_string() << std::endl;
+        std::cout << "  Input shape: " << input->shape().to_string() << std::endl;
+        
+        while(input->has_next()) {
+            auto entry = input->next();
+            std::cout << "  Sample " << count << ": label=" << entry.first 
+                    << ", tensor shape=" << entry.second.shape().to_string()
+                    << ", total elements=" << entry.second.shape().product() << std::endl;
+            
+            // Convert to sparse tensor
+            SparseTensor<float> sparse_tensor = to_sparse_tensor(entry.second);
+            std::cout << "    → Converted to sparse tensor: non-zero elements=" 
+                    << sparse_tensor.values().size() 
+                    << " (" << (sparse_tensor.values().size() * 100.0f / entry.second.shape().product()) 
+                    << "% of original)" << std::endl;
+            
+            _train_set.emplace_back(entry.first, sparse_tensor);
+            count++;
+            
+            // Only print details for first few samples
+            if (count >= 3) {
+                std::cout << "  ... (showing only first 3 samples)" << std::endl;
+                break;
+            }
+        }
+        
+        // Continue loading remaining samples without detailed output
+        while(input->has_next()) {
+            auto entry = input->next();
+            _train_set.emplace_back(entry.first, to_sparse_tensor(entry.second));
+            count++;
+        }
+        
+        _experiment.log() << "Loaded " << count << " train samples from " << input->to_string() << std::endl;
+        std::cout << "  Total training samples from this input: " << count << std::endl;
+        input->close();
+    }
+
+    // Load testing data
+    for(Input* input : _experiment.test_data()) {
+        size_t count = 0;
+        std::cout << "Processing test input: " << input->to_string() << std::endl;
+        std::cout << "  Input shape: " << input->shape().to_string() << std::endl;
+        
+        while(input->has_next()) {
+            auto entry = input->next();
+            std::cout << "  Sample " << count << ": label=" << entry.first 
+                    << ", tensor shape=" << entry.second.shape().to_string()
+                    << ", total elements=" << entry.second.shape().product() << std::endl;
+            
+            // Convert to sparse tensor
+            SparseTensor<float> sparse_tensor = to_sparse_tensor(entry.second);
+            std::cout << "    → Converted to sparse tensor: non-zero elements=" 
+                    << sparse_tensor.values().size() 
+                    << " (" << (sparse_tensor.values().size() * 100.0f / entry.second.shape().product()) 
+                    << "% of original)" << std::endl;
+            
+            _test_set.emplace_back(entry.first, sparse_tensor);
+            count++;
+            
+            // Only print details for first few samples
+            if (count >= 3) {
+                std::cout << "  ... (showing only first 3 samples)" << std::endl;
+                break;
+            }
+        }
+        
+        // Continue loading remaining samples without detailed output
+        while(input->has_next()) {
+            auto entry = input->next();
+            _test_set.emplace_back(entry.first, to_sparse_tensor(entry.second));
+            count++;
+        }
+        
+        _experiment.log() << "Loaded " << count << " test samples from " << input->to_string() << std::endl;
+        std::cout << "  Total test samples from this input: " << count << std::endl;
+        input->close();
+    }
+    
+    std::cout << "\nSUMMARY:" << std::endl;
+    std::cout << "Total training samples: " << _train_set.size() << std::endl;
+    std::cout << "Total test samples: " << _test_set.size() << std::endl;
+    std::cout << "=========================================\n\n";
 }
 
 void SparseIntermediateExecution::_process_train_data(AbstractProcess& process, std::vector<std::pair<std::string, SparseTensor<float>>>& data, size_t refresh_interval) {

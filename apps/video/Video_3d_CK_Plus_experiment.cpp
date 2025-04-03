@@ -25,7 +25,7 @@ int main(int argc, char **argv)
 {
     // Parse command line arguments
     size_t _filter_size = (argc > 1) ? atoi(argv[1]) : 10;
-    int _repeats = (argc > 2) ? atoi(argv[2]) : 5;
+    int _repeats = (argc > 2) ? atoi(argv[2]) : 1;
     int _epochs = (argc > 3) ? atoi(argv[3]) : 800;
     float _th = (argc > 4) ? atof(argv[4]) : 8.0;
     
@@ -58,6 +58,9 @@ int main(int argc, char **argv)
                 experiment.log() << "Failed to load CK+ dataset" << std::endl;
                 return 1;
             }
+            else {
+                experiment.log() << "CK+ dataset loaded successfully" << std::endl;
+            }
             
             // Get training and testing sequences for this fold
             auto training_sequences = ck_plus.getTrainingSequences(fold);
@@ -69,7 +72,7 @@ int main(int argc, char **argv)
             // Network parameters
             size_t _temporal_sum_pooling = 2;
             size_t _sum_pooling = 8;
-            size_t tmp_filter_size = _filter_size;
+            size_t tmp_filter_size = 1;
             size_t filter_number = 64;
             size_t tmp_stride = 1;
 
