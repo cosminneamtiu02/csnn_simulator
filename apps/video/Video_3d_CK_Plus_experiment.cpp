@@ -23,10 +23,15 @@
 
 int main(int argc, char **argv)
 {
-    // Parse command line arguments 
-    size_t _filter_size = (argc > 1) ? atoi(argv[1]) : 10;
-    int _epochs = (argc > 2) ? atoi(argv[2]) : 800;
-    float _th = (argc > 3) ? atof(argv[3]) : 8.0;
+    // Parse command line arguments with new parameters
+    size_t _filter_width = (argc > 1) ? atoi(argv[1]) : 5;
+    size_t _filter_height = (argc > 2) ? atoi(argv[2]) : 5;
+    size_t _filter_depth = (argc > 3) ? atoi(argv[3]) : 3;
+    size_t _temporal_sum_pooling = (argc > 4) ? atoi(argv[4]) : 3;
+    
+    // Keep epochs and threshold unchanged
+    int _epochs = (argc > 5) ? atoi(argv[5]) : 800;
+    float _th = (argc > 6) ? atof(argv[6]) : 8.0;
     
     // Get dataset paths from environment variables
     const char* csv_path_ptr = std::getenv("CK_PLUS_CSV_PATH");
@@ -44,7 +49,7 @@ int main(int argc, char **argv)
     std::string csv_path(csv_path_ptr);
     std::string images_dir(images_dir_ptr);
     
-    int num_folds = 5;
+    int num_folds = 10;
     unsigned int random_seed = 42;
     
     // Video frame dimensions
@@ -55,9 +60,12 @@ int main(int argc, char **argv)
     time(&start_time);
 
     for (int fold = 1; fold <= num_folds; fold++) {
+        // Update experiment name to include all parameters
         std::string _dataset = "CK_Plus_" + std::to_string(start_time) + "_3D_" + 
-                               std::to_string(_filter_size) + "_fold" + std::to_string(fold) + 
-                               "_epochs" + std::to_string(_epochs);
+                               std::to_string(_filter_width) + "x" + 
+                               std::to_string(_filter_height) + "x" + 
+                               std::to_string(_filter_depth) + "_fold" + 
+                               std::to_string(fold) + "_epochs" + std::to_string(_epochs);
 
         Experiment<SparseIntermediateExecution> experiment(argc, argv, _dataset);
         
@@ -79,10 +87,23 @@ int main(int argc, char **argv)
         experiment.log() << "Training sequences: " << training_sequences.size() << std::endl;
         experiment.log() << "Testing sequences: " << testing_sequences.size() << std::endl;
         
-        // Network parameters
-        size_t _temporal_sum_pooling = 2;
+        // Debug input shapes
+        experiment.log() << "Inspecting first few sequences:" << std::endl;
+        
+        if (!training_sequences.empty()) {
+            auto& seq = training_sequences[0];
+            experiment.log() << "Example training sequence: " 
+                            << "Subject=" << seq.subject
+                            << ", Emotion=" << ck_plus.getEmotionName(seq.emotion)
+                            << ", Frames=" << seq.frames.size() << std::endl;
+                            
+            // Create a tensor to check shape
+            auto tensor = ck_plus.sequenceToTensor(seq);
+            experiment.log() << "Resulting tensor shape: " << tensor->shape().to_string() << std::endl;
+        }
+        
+        // Network parameters - use the parameterized values
         size_t _sum_pooling = 8;
-        size_t tmp_filter_size = 1;
         size_t filter_number = 64;
         size_t tmp_stride = 1;
 
@@ -139,9 +160,9 @@ int main(int argc, char **argv)
         float th_lr = 0.09f;
         float w_lr = 0.009f;
 
-        // Setup 3D convolutional layer
+        //volatile int debug_marker = 123;
         auto &conv1 = experiment.push<layer::Convolution3D>(
-            _filter_size, _filter_size, tmp_filter_size, filter_number, "", 1, 1, tmp_stride);
+            _filter_width, _filter_height, _filter_depth, filter_number, "", 1, 1, tmp_stride);
             
         conv1.set_name("conv1");
         conv1.parameter<bool>("draw").set(false);

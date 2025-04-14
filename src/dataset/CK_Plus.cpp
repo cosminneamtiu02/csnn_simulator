@@ -64,10 +64,6 @@ bool CK_Plus::load() {
             // Only add sequences that have frames
             if (!seq.frames.empty()) {
                 all_sequences.push_back(seq);
-                LOG_INFO(1, "Added sequence: Subject=" << subject 
-                           << ", Ipostase=" << ipostase 
-                           << ", Emotion=" << emotion
-                           << ", Frames=" << seq.frames.size() << std::endl);
             }
         } catch (const std::exception& e) {
             LOG_ERROR("Error processing line " << line_count << ": " << e.what() << std::endl);
