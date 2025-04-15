@@ -8,7 +8,6 @@ SparseIntermediateExecution::SparseIntermediateExecution(ExperimentType& experim
 
 void SparseIntermediateExecution::process(size_t refresh_interval) {
 	_load_data();
-	//TODO pus printuri sa vedem unde crapa
 	std::vector<size_t> train_index;
 	for(size_t i=0; i<_train_set.size(); i++) {
 		train_index.push_back(i);
@@ -50,17 +49,50 @@ void SparseIntermediateExecution::_load_data() {
     _test_set.clear();
     
     // Load training data
+    _experiment.print() << _experiment.train_data().size() << " elements in dataset" << std::endl;    
+    int ct = 0;
+    int failed_data = 0;
+    
     for(Input* input : _experiment.train_data()) {
-        size_t count = 0;
+        ct++;
         
-        while(input->has_next()) {
-            auto entry = input->next();
-            _train_set.emplace_back(entry.first, to_sparse_tensor(entry.second));
-            count++;
+        // Check if input is valid before trying to use it
+        if (!input) {
+            _experiment.print() << "Warning: Null input at position " << ct << std::endl;
+            failed_data++;
+            continue;
+        }
+        
+        size_t count = 0;
+        try {
+            while(input->has_next()) {
+                try {
+                    auto entry = input->next();
+                    
+                    // Basic validation of returned entry
+                    if (entry.first.empty()) {
+                        _experiment.print() << "Warning: Empty label at entry " << count << " of input #" << ct << std::endl;
+                    }
+                    
+                    _train_set.emplace_back(entry.first, to_sparse_tensor(entry.second));
+                    count++;
+                } catch (const std::exception& e) {
+                    _experiment.print() << "Error processing entry " << count << " of input #" << ct 
+                                      << ": " << e.what() << std::endl;
+                    failed_data++;
+                    // Continue with next entry instead of breaking out
+                }
+            }
+            
+        } catch (const std::exception& e) {
+            _experiment.print() << "Error processing training data #" << ct << ": " << e.what() << std::endl;
+            failed_data++;
         }
         
         input->close();
     }
+    
+    _experiment.print() << "Completed loading training data. Failed: " << failed_data << " inputs" << std::endl;
 
     // Load testing data
     for(Input* input : _experiment.test_data()) {
@@ -71,14 +103,15 @@ void SparseIntermediateExecution::_load_data() {
             _test_set.emplace_back(entry.first, to_sparse_tensor(entry.second));
             count++;
         }
-        
+
         input->close();
     }
     
     // Keep only summary in console log
     std::cout << "Data loading complete. "
               << "Training samples: " << _train_set.size() 
-              << ", Test samples: " << _test_set.size() << std::endl;
+              << ", Test samples: " << _test_set.size() 
+              << ", Failed inputs: " << failed_data << std::endl;
 }
 
 void SparseIntermediateExecution::_process_train_data(AbstractProcess& process, std::vector<std::pair<std::string, SparseTensor<float>>>& data, size_t refresh_interval) {

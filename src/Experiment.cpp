@@ -177,18 +177,6 @@ void AbstractExperiment::run(size_t refresh_interval) {
 
 	Shape current_shape = *_input_shape;
 
-	_log << "Input data " << current_shape.to_string() << std::endl;
-	_log << "Train:" << std::endl;
-	for(size_t i=0; i<_train_data.size(); i++) {
-		_log << "#" << (i+1) << ": " << _train_data[i]->to_string() << std::endl;
-	}
-	_log << "Test:" << std::endl;
-	for(size_t i=0; i<_test_data.size(); i++) {
-		_log << "#" << (i+1) << ": " << _test_data[i]->to_string() << std::endl;
-	}
-	_log << std::endl;
-
-
 	for(size_t i=0; i<_process_list.size(); i++) {
 		current_shape = _process_list[i]->resize(current_shape);
 		_process_list[i]->_initialize(_random_generator);

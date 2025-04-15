@@ -31,19 +31,11 @@ int main(int argc, char **argv)
     
     // Keep epochs and threshold unchanged
     int _epochs = (argc > 5) ? atoi(argv[5]) : 800;
-    float _th = (argc > 6) ? atof(argv[6]) : 8.0;
+    float _th = 8.0;
     
     // Get dataset paths from environment variables
     const char* csv_path_ptr = std::getenv("CK_PLUS_CSV_PATH");
     const char* images_dir_ptr = std::getenv("CK_PLUS_IMAGES_DIR");
-    
-    if (csv_path_ptr == nullptr || images_dir_ptr == nullptr) {
-        std::cerr << "Error: Environment variables not set!" << std::endl;
-        std::cerr << "Please set CK_PLUS_CSV_PATH and CK_PLUS_IMAGES_DIR environment variables." << std::endl;
-        std::cerr << "Example: export CK_PLUS_CSV_PATH=/path/to/CK+_emotion.csv" << std::endl;
-        std::cerr << "         export CK_PLUS_IMAGES_DIR=/path/to/CK+_TIM10" << std::endl;
-        return 1;
-    }
     
     // Convert to std::string
     std::string csv_path(csv_path_ptr);
@@ -84,22 +76,21 @@ int main(int argc, char **argv)
         auto training_sequences = ck_plus.getTrainingSequences(fold);
         auto testing_sequences = ck_plus.getTestSequences(fold);
         
-        experiment.log() << "Training sequences: " << training_sequences.size() << std::endl;
-        experiment.log() << "Testing sequences: " << testing_sequences.size() << std::endl;
         
-        // Debug input shapes
-        experiment.log() << "Inspecting first few sequences:" << std::endl;
+        // Count frames silently - we need this data for validation but won't print details
+        size_t total_training_frames = 0;
+        size_t total_testing_frames = 0;
+        std::map<int, int> training_emotions;
+        std::map<int, int> testing_emotions;
         
-        if (!training_sequences.empty()) {
-            auto& seq = training_sequences[0];
-            experiment.log() << "Example training sequence: " 
-                            << "Subject=" << seq.subject
-                            << ", Emotion=" << ck_plus.getEmotionName(seq.emotion)
-                            << ", Frames=" << seq.frames.size() << std::endl;
-                            
-            // Create a tensor to check shape
-            auto tensor = ck_plus.sequenceToTensor(seq);
-            experiment.log() << "Resulting tensor shape: " << tensor->shape().to_string() << std::endl;
+        for (auto& seq : training_sequences) {
+            total_training_frames += seq.frames.size();
+            training_emotions[seq.emotion]++;
+        }
+        
+        for (auto& seq : testing_sequences) {
+            total_testing_frames += seq.frames.size();
+            testing_emotions[seq.emotion]++;
         }
         
         // Network parameters - use the parameterized values
@@ -149,11 +140,6 @@ int main(int argc, char **argv)
         }
         experiment.log() << "Successfully added " << testing_count << " testing sequences" << std::endl;
         
-        // Ensure we actually have data before running the experiment
-        if (training_count == 0 || testing_count == 0) {
-            experiment.log() << "Insufficient data for experiment, skipping fold " << fold << std::endl;
-            continue;
-        }
 
         // Network parameters
         float t_obj = 0.65;

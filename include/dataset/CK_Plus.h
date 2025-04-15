@@ -99,6 +99,7 @@ private:
     std::string _class_name;
     size_t _current_index;
     Shape _shape;
+    bool _has_valid_data;
 };
 
-} // namespace dataset
+}

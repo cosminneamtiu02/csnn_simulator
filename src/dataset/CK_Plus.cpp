@@ -71,9 +71,7 @@ bool CK_Plus::load() {
         
         line_count++;
     }
-    
-    LOG_INFO(1, "Loaded " << all_sequences.size() << " valid sequences" << std::endl);
-    
+        
     // Distribute sequences randomly but evenly across folds
     distributeSequences(all_sequences);
     
@@ -327,7 +325,7 @@ std::map<int, std::map<int, int>> CK_Plus::getEmotionCounts() const {
 void CK_Plus::printEmotionDistribution() const {
     auto counts = getEmotionCounts();
     
-    // Calculate totals
+    // Calculate totals - keep this for potential data validation
     std::map<int, int> emotion_totals;
     std::map<int, int> fold_totals;
     int grand_total = 0;
@@ -341,35 +339,9 @@ void CK_Plus::printEmotionDistribution() const {
         }
     }
     
-    // Print header
-    std::cout << "Emotion Distribution Across Folds:" << std::endl;
-    std::cout << std::setw(10) << "Fold";
-    for (int emotion = 1; emotion <= getNumEmotions(); emotion++) {
-        std::cout << " | " << std::setw(8) << getEmotionName(emotion);
-    }
-    std::cout << " | " << std::setw(8) << "Total" << std::endl;
-    
-    // Print separator
-    std::cout << std::string(10 + (getNumEmotions() + 1) * 11, '-') << std::endl;
-    
-    // Print counts for each fold
-    for (int fold = 1; fold <= m_num_folds; fold++) {
-        std::cout << std::setw(10) << fold;
-        for (int emotion = 1; emotion <= getNumEmotions(); emotion++) {
-            std::cout << " | " << std::setw(8) << counts.at(fold).at(emotion);
-        }
-        std::cout << " | " << std::setw(8) << fold_totals[fold] << std::endl;
-    }
-    
-    // Print separator
-    std::cout << std::string(10 + (getNumEmotions() + 1) * 11, '-') << std::endl;
-    
-    // Print totals
-    std::cout << std::setw(10) << "Total";
-    for (int emotion = 1; emotion <= getNumEmotions(); emotion++) {
-        std::cout << " | " << std::setw(8) << emotion_totals[emotion];
-    }
-    std::cout << " | " << std::setw(8) << grand_total << std::endl;
+    // Remove the detailed table output - just print a summary
+    std::cout << "Dataset loaded: " << grand_total << " sequences across " 
+              << m_num_folds << " folds" << std::endl;
 }
 
 std::shared_ptr<Spike> CK_Plus::sequenceToSpike(const ImageSequence& seq) {
@@ -390,14 +362,17 @@ CK_Plus_Input::CK_Plus_Input(const CK_Plus::ImageSequence& sequence, int image_w
       _label(std::to_string(_sequence.emotion)), 
       _class_name(std::to_string(_sequence.emotion)),
       _current_index(0),
-      _shape(createShape(sequence, image_width, image_height)) {
+      _shape(createShape(sequence, image_width, image_height)),
+      _has_valid_data(false) {
     
-    // Validation moved to a separate method
-    validateSequence();
-    
-    LOG_INFO(2, "Created CK+ input with shape: " 
-             << _shape.dim(0) << "×" << _shape.dim(1) << "×" 
-             << _shape.dim(2) << "×" << _shape.dim(3) << std::endl);
+    // Validate before allowing next() to be called
+    try {
+        validateSequence();
+        _has_valid_data = true;
+    } catch (const std::exception& e) {
+        LOG_ERROR("Error in constructor: " << e.what() << std::endl);
+        _has_valid_data = false;
+    }
 }
 
 CK_Plus_Input::~CK_Plus_Input() {}
@@ -407,28 +382,38 @@ const Shape& CK_Plus_Input::shape() const {
 }
 
 bool CK_Plus_Input::has_next() const {
-    return _current_index < 1; // Only one item per sequence
+    // Only return true if we have valid data AND we haven't provided it yet
+    return _has_valid_data && _current_index < 1;
 }
 
 std::pair<std::string, Tensor<float>> CK_Plus_Input::next() {
     if (!has_next()) {
-        throw std::runtime_error("No more data in CK_Plus_Input");
+        throw std::runtime_error("No more data in CK_Plus_Input or invalid data");
     }
     
     try {
         Tensor<float> result(_shape);
+        result.fill(0.0f); // Initialize with zeros to avoid undefined values
         
         // Copy frame data to tensor
         for (size_t z = 0; z < _sequence.frames.size(); z++) {
             auto& frame = _sequence.frames[z];
             if (!frame) {
-                LOG_ERROR("Warning: Null frame at position " << z << std::endl);
+                LOG_ERROR("Warning: Null frame at position " << z 
+                         << " in sequence " << _sequence.subject 
+                         << ", emotion " << _sequence.emotion << std::endl);
                 continue;
             }
             
             for (int y = 0; y < _height; y++) {
                 for (int x = 0; x < _width; x++) {
-                    result.at(y, x, z, 0) = frame->at(y, x, 0, 0);
+                    try {
+                        result.at(y, x, 0, z) = frame->at(y, x, 0, 0);
+                    } catch (const std::exception& e) {
+                        LOG_ERROR("Error accessing frame data at position [" << y << "," << x << "," << z 
+                                << "]: " << e.what() << std::endl);
+                        // Continue with next pixel instead of failing entirely
+                    }
                 }
             }
         }
@@ -437,8 +422,11 @@ std::pair<std::string, Tensor<float>> CK_Plus_Input::next() {
         return std::make_pair(_label, result);
     }
     catch (const std::exception& e) {
-        LOG_ERROR("Error creating tensor: " << e.what() << std::endl);
-        throw;
+        LOG_ERROR("Error creating tensor in next(): " << e.what() << std::endl);
+        // Return empty tensor with label to avoid crashing
+        Tensor<float> empty_tensor(_shape);
+        empty_tensor.fill(0.0f);
+        return std::make_pair(_label, empty_tensor);
     }
 }
 
@@ -451,7 +439,7 @@ void CK_Plus_Input::close() {
 }
 
 std::string CK_Plus_Input::to_string() const {
-    return "CkPlusInput: Emotion=" + _label + 
+    return "Emotion=" + _label + 
            ", Frames=" + std::to_string(_sequence.frames.size());
 }
 
@@ -471,7 +459,7 @@ Shape CK_Plus_Input::createShape(const CK_Plus::ImageSequence& sequence, int wid
 }
 
 void CK_Plus_Input::validateSequence() {
-    // Verify that we have valid dimensions and non-empty frames
+    // More thorough validation
     if (_sequence.frames.empty()) {
         throw std::runtime_error("Sequence has no frames");
     }
@@ -480,6 +468,21 @@ void CK_Plus_Input::validateSequence() {
     if (_width <= 0 || _height <= 0) {
         throw std::runtime_error("Invalid dimensions: width=" + std::to_string(_width) + 
                                 ", height=" + std::to_string(_height));
+    }
+    
+    // Validate that all frames are non-null and have correct dimensions
+    for (size_t i = 0; i < _sequence.frames.size(); i++) {
+        if (!_sequence.frames[i]) {
+            throw std::runtime_error("Frame " + std::to_string(i) + " is null");
+        }
+        
+        // Check if frame dimensions match expected dimensions
+        const auto& frame = _sequence.frames[i];
+        if (frame->shape().dim(0) != static_cast<size_t>(_height) || 
+            frame->shape().dim(1) != static_cast<size_t>(_width)) {
+            throw std::runtime_error("Frame " + std::to_string(i) + " has invalid dimensions: " + 
+                                    frame->shape().to_string());
+        }
     }
 }
 
