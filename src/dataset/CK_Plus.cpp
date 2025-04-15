@@ -266,8 +266,8 @@ std::shared_ptr<Tensor<float>> CK_Plus::sequenceToTensor(const ImageSequence& se
     // Create a 3D tensor using Shape
     std::vector<size_t> dims = {static_cast<size_t>(height), 
                                static_cast<size_t>(width), 
-                               static_cast<size_t>(depth), 
-                               1};
+                               1,
+                               static_cast<size_t>(depth)};
     Shape shape(dims);
     auto tensor = std::make_shared<Tensor<float>>(shape);
     
@@ -279,7 +279,7 @@ std::shared_ptr<Tensor<float>> CK_Plus::sequenceToTensor(const ImageSequence& se
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 float value = frame->at(y, x, 0, 0);
-                tensor->at(y, x, z, 0) = value;
+                tensor->at(y, x, 0, z) = value;
             }
         }
         
@@ -467,7 +467,7 @@ Shape CK_Plus_Input::createShape(const CK_Plus::ImageSequence& sequence, int wid
     size_t d = sequence.frames.empty() ? 1 : static_cast<size_t>(sequence.frames.size());
     size_t c = 1; // channels
     
-    return Shape({h, w, d, c});
+    return Shape({h, w, c, d});
 }
 
 void CK_Plus_Input::validateSequence() {

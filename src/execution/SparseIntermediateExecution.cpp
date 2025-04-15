@@ -8,7 +8,7 @@ SparseIntermediateExecution::SparseIntermediateExecution(ExperimentType& experim
 
 void SparseIntermediateExecution::process(size_t refresh_interval) {
 	_load_data();
-
+	//TODO pus printuri sa vedem unde crapa
 	std::vector<size_t> train_index;
 	for(size_t i=0; i<_train_set.size(); i++) {
 		train_index.push_back(i);
