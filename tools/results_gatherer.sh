@@ -20,6 +20,9 @@ output_filename="results.csv"
 # Full path to output file
 output_csv="${output_dir}/${output_filename}"
 
+# Temporary file for results before sorting
+temp_csv="${output_dir}/temp_results.csv"
+
 # Check if input directory exists
 if [ ! -d "$input_dir" ]; then
     echo "Error: Directory $input_dir does not exist."
@@ -49,6 +52,9 @@ fi
 # Create CSV header
 echo "id,seed,fold,epochs,width,height,depth,temporal_pooling,spatial_pooling,classification_rate" > "$output_csv"
 
+# Create temporary file with header for storing results before sorting
+echo "id,seed,fold,epochs,width,height,depth,temporal_pooling,spatial_pooling,classification_rate" > "$temp_csv"
+
 # Counter for processed files
 processed=0
 
@@ -71,8 +77,8 @@ for file_path in "$input_dir"/*.txt; do
     
     # Check if extraction was successful
     if [ $? -eq 0 ] && [ ! -z "$result" ]; then
-        # Replace spaces with commas for CSV format and append to output file
-        echo "$result" | tr ' ' ',' >> "$output_csv"
+        # Replace spaces with commas for CSV format and append to temporary file
+        echo "$result" | tr ' ' ',' >> "$temp_csv"
         ((processed++))
     else
         echo "Warning: Failed to process $filename, skipping"
@@ -80,4 +86,22 @@ for file_path in "$input_dir"/*.txt; do
 done
 
 echo "Processing complete. $processed files were analyzed."
-echo "Results saved to $output_csv"
+
+# Only proceed with sorting if we have results
+if [ $processed -gt 0 ]; then
+    # Keep the header line
+    head -1 "$temp_csv" > "$output_csv"
+    
+    # Sort the rest of the lines (skip header) by id, seed, and fold as integers
+    tail -n +2 "$temp_csv" | sort -t, -k1,1n -k2,2n -k3,3n >> "$output_csv"
+    
+    # Remove temporary file
+    rm "$temp_csv"
+    
+    echo "Results sorted by id, seed, and fold and saved to $output_csv"
+else
+    # Just copy the header if no results were found
+    cp "$temp_csv" "$output_csv"
+    rm "$temp_csv"
+    echo "No results were found. Only header saved to $output_csv"
+fi

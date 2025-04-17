@@ -45,7 +45,16 @@ epochs=$(echo "$filename" | grep -o 'epochs[0-9]\+' | grep -o '[0-9]\+')
 seed=$(echo "$filename" | grep -o 'seed[0-9]\+' | grep -o '[0-9]\+')
 
 # Extract classification rate from file content
-classification_rate=$(grep "classification rate:" "$full_path" | grep -o '[0-9]\+\.[0-9]\+')
+# Modified to handle both integer and floating point percentages
+classification_rate=$(grep "classification rate:" "$full_path" | grep -o '[0-9]\+\(\.[0-9]\+\)\?%' | tr -d '%')
+
+# Check if we got a classification rate, if not, print debug info and fail
+if [ -z "$classification_rate" ]; then
+    echo "Error: Could not find classification rate in $filename" >&2
+    echo "Debug info: Classification line from file:" >&2
+    grep "classification rate:" "$full_path" >&2
+    exit 1
+fi
 
 # Output all parameters in the specified order
 echo "$id $seed $fold $epochs $width $height $depth $temporal_pooling $spatial_pooling $classification_rate"
