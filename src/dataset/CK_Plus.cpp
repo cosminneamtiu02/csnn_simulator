@@ -88,7 +88,6 @@ void CK_Plus::distributeSequences(std::vector<ImageSequence>& sequences) {
         sequences_by_emotion[seq.emotion].push_back(seq);
     }
     
-    // Seed random generator for reproducibility
     std::mt19937 rng(m_random_seed);
     
     // For each emotion, randomly distribute sequences across folds
@@ -339,9 +338,9 @@ void CK_Plus::printEmotionDistribution() const {
         }
     }
     
-    // Remove the detailed table output - just print a summary
+    // Remove the detailed table output - just print a summary with seed info
     std::cout << "Dataset loaded: " << grand_total << " sequences across " 
-              << m_num_folds << " folds" << std::endl;
+              << m_num_folds << " folds (using seed: " << m_random_seed << ")" << std::endl;
 }
 
 std::shared_ptr<Spike> CK_Plus::sequenceToSpike(const ImageSequence& seq) {

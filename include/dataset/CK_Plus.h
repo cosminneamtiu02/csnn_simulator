@@ -46,6 +46,7 @@ public:
     // Helper functions
     int getNumEmotions() const { return 6; }
     int getNumFolds() const { return m_num_folds; }
+    unsigned int getRandomSeed() const { return m_random_seed; }
     std::map<int, std::map<int, int>> getEmotionCounts() const;
     std::string getEmotionName(int emotion) const;
     void printEmotionDistribution() const;

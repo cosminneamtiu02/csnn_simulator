@@ -33,6 +33,12 @@ int main(int argc, char **argv)
     int _epochs = (argc > 5) ? atoi(argv[5]) : 800;
     float _th = 8.0;
     
+    // Add random seed parameter
+    unsigned int random_seed = (argc > 6) ? atoi(argv[6]) : 42;
+    
+    // Print the actual value used AFTER parsing arguments
+    std::cout << "Random seed: " << random_seed << std::endl;
+    
     // Get dataset paths from environment variables
     const char* csv_path_ptr = std::getenv("CK_PLUS_CSV_PATH");
     const char* images_dir_ptr = std::getenv("CK_PLUS_IMAGES_DIR");
@@ -42,7 +48,6 @@ int main(int argc, char **argv)
     std::string images_dir(images_dir_ptr);
     
     int num_folds = 10;
-    unsigned int random_seed = 42;
     
     // Video frame dimensions
     size_t _frame_size_width = 48;
@@ -57,13 +62,14 @@ int main(int argc, char **argv)
                                std::to_string(_filter_width) + "x" + 
                                std::to_string(_filter_height) + "x" + 
                                std::to_string(_filter_depth) + "_fold" + 
-                               std::to_string(fold) + "_epochs" + std::to_string(_epochs);
+                               std::to_string(fold) + "_epochs" + std::to_string(_epochs) +
+                               "_seed" + std::to_string(random_seed);
 
         Experiment<SparseIntermediateExecution> experiment(argc, argv, _dataset);
         
-        // Load CK+ dataset with paths from environment variables
+        // Load CK+ dataset with paths from environment variables and use the command line random_seed
         dataset::CK_Plus ck_plus(csv_path, images_dir, num_folds, random_seed, 
-                                 _frame_size_width, _frame_size_height);
+                                 _frame_size_width, _frame_size_height);     
         if (!ck_plus.load()) {
             experiment.log() << "Failed to load CK+ dataset" << std::endl;
             return 1;
