@@ -40,7 +40,7 @@ sudo add-apt-repository ppa:rock-core/qt4 && sudo apt install qt4-default
 ```
 mkdir csnn-simulator-build
 cd csnn-simulator-build
-cmake cmake ../../csnn-simulator -G"Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DUSE_GUI=NO
+cmake ../../csnn-simulator -G"Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DUSE_GUI=NO
 make
 ```
 
