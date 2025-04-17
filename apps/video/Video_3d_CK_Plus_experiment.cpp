@@ -36,8 +36,12 @@ int main(int argc, char **argv)
     // Add random seed parameter
     unsigned int random_seed = (argc > 6) ? atoi(argv[6]) : 42;
     
-    // Print the actual value used AFTER parsing arguments
+    // Add spatial pooling parameter
+    size_t _spatial_pooling = (argc > 7) ? atoi(argv[7]) : 8;
+    
+    // Print parameters
     std::cout << "Random seed: " << random_seed << std::endl;
+    std::cout << "Spatial pooling: " << _spatial_pooling << std::endl;
     
     // Get dataset paths from environment variables
     const char* csv_path_ptr = std::getenv("CK_PLUS_CSV_PATH");
@@ -61,7 +65,9 @@ int main(int argc, char **argv)
         std::string _dataset = "CK_Plus_" + std::to_string(start_time) + "_3D_" + 
                                std::to_string(_filter_width) + "x" + 
                                std::to_string(_filter_height) + "x" + 
-                               std::to_string(_filter_depth) + "_fold" + 
+                               std::to_string(_filter_depth) + "_tp" +
+                               std::to_string(_temporal_sum_pooling) + "_sp" +
+                               std::to_string(_spatial_pooling) + "_fold" + 
                                std::to_string(fold) + "_epochs" + std::to_string(_epochs) +
                                "_seed" + std::to_string(random_seed);
 
@@ -100,7 +106,6 @@ int main(int argc, char **argv)
         }
         
         // Network parameters - use the parameterized values
-        size_t _sum_pooling = 8;
         size_t filter_number = 64;
         size_t tmp_stride = 1;
 
@@ -173,7 +178,7 @@ int main(int argc, char **argv)
 
         // Setup output
         auto &conv1_out = experiment.output<TimeObjectiveOutput>(conv1, t_obj);
-        conv1_out.add_postprocessing<process::SumPooling>(_sum_pooling, _sum_pooling);
+        conv1_out.add_postprocessing<process::SumPooling>(_spatial_pooling, _spatial_pooling);
         conv1_out.add_postprocessing<process::TemporalPooling>(_temporal_sum_pooling);
         conv1_out.add_postprocessing<process::FeatureScaling>();
         conv1_out.add_analysis<analysis::Activity>();

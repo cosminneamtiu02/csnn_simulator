@@ -5,6 +5,7 @@
 height_width=(3 5 7)
 depth=(2 3 4 5)  # Added depth 2 as mentioned in requirements
 seed=(42 13 93 45 96 6 98 59 44)
+spatial_pooling=(8)  # Added spatial pooling parameter with single value for now
 
 # Output file path - you can modify this variable to change the output location
 output_file="runs.txt"
@@ -33,10 +34,12 @@ for hw in "${height_width[@]}"; do
 
         for tp in "${temp_pooling_values[@]}"; do
             for s in "${seed[@]}"; do
-                # Generate the command with the current parameter values
-                command="./Video_3d_CK_Plus_experiment $hw $hw $d $tp 800 $s"
-                echo "$command" >> "$output_file"
-                ((counter++))
+                for sp in "${spatial_pooling[@]}"; do
+                    # Generate the command with the current parameter values
+                    command="./Video_3d_CK_Plus_experiment $hw $hw $d $tp 800 $s $sp"
+                    echo "$command" >> "$output_file"
+                    ((counter++))
+                done
             done
         done
     done
