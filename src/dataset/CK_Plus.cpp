@@ -156,8 +156,8 @@ std::shared_ptr<Tensor<float>> CK_Plus::loadImage(const std::string& path, bool 
     if (image.rows != m_image_height || image.cols != m_image_width) {
         cv::resize(image, image, cv::Size(m_image_width, m_image_height));
     }
-    
-    // Create shape for the tensor
+
+    // Create shape for the tensor - note the ordering
     std::vector<size_t> dims = {static_cast<size_t>(m_image_height), 
                                static_cast<size_t>(m_image_width), 
                                1, 1};

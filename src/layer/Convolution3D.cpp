@@ -97,6 +97,54 @@ size_t Convolution3D::train_pass_number() const
 	return _epoch_number + 1;
 }
 
+/**
+ * Helper function to sample a point inside an elliptical region of the image
+ * @param W Image width
+ * @param H Image height
+ * @param fw Filter width
+ * @param fh Filter height
+ * @param rng Random number generator
+ * @return Pair of x,y coordinates
+ */
+std::pair<size_t, size_t> Convolution3D::sample_point_inside_ellipse(
+    size_t W, size_t H, size_t fw, size_t fh, std::default_random_engine& rng) 
+{
+    const double rx = 0.35;
+    const double ry = 0.45;
+
+    const double cx = W / 2.0;
+    const double cy = H / 2.0;
+
+    const double a = rx * W;
+    const double b = ry * H;
+
+    // Shrink to ensure filter stays inside
+    const double a_safe = a - fw / 2.0;
+    const double b_safe = b - fh / 2.0;
+
+    std::uniform_real_distribution<double> dist_angle(0, 2 * M_PI);
+    std::uniform_real_distribution<double> dist_radius(0, 1);
+
+    double x, y;
+    while (true) {
+        double r = std::sqrt(dist_radius(rng));
+        double theta = dist_angle(rng);
+
+        double dx = a_safe * r * std::cos(theta);
+        double dy = b_safe * r * std::sin(theta);
+
+        x = cx + dx - fw / 2.0;
+        y = cy + dy - fh / 2.0;
+
+        // Make sure it's within image bounds
+        if (x >= 0 && y >= 0 && x + fw <= W && y + fh <= H) {
+            break;
+        }
+    }
+
+    return {static_cast<size_t>(x), static_cast<size_t>(y)};
+}
+
 void Convolution3D::process_train_sample(const std::string &label, Tensor<float> &sample, size_t current_pass, size_t current_index, size_t number)
 {
 	// The training
@@ -132,22 +180,16 @@ void Convolution3D::process_train_sample(const std::string &label, Tensor<float>
 		size_t z = 0;
 		size_t k = 0;
 		float t = 0.0;
-		// size_t _empty_sample_count = 0;
-		// bool _sample_contain_info = Tensor<float>::tensor_contain_info(sample);
 
-		// do // take the random patches around places where a spike exists
-		// {
+		// Replace uniform sampling with elliptical sampling
+		if (_filter_width < _width && _filter_height < _height)
+		{
+			auto [sample_x, sample_y] = sample_point_inside_ellipse(
+				_width, _height, _filter_width, _filter_height, experiment()->random_generator());
+			x = sample_x;
+			y = sample_y;
+		}
 
-		if (_filter_width < _width)
-		{
-			std::uniform_int_distribution<size_t> rand_x(0, _width - _filter_width);
-			x = rand_x(experiment()->random_generator());
-		}
-		if (_filter_height < _height)
-		{
-			std::uniform_int_distribution<size_t> rand_y(0, _height - _filter_height);
-			y = rand_y(experiment()->random_generator());
-		}
 		if (_filter_conv_depth < _conv_depth)
 		{
 			std::uniform_int_distribution<size_t> rand_y(0, _conv_depth - _filter_conv_depth);
@@ -158,14 +200,6 @@ void Convolution3D::process_train_sample(const std::string &label, Tensor<float>
 		z = rand_z(experiment()->random_generator());
 		t = sample.at(x, y, z, k);
 
-		// if (!_sample_contain_info)
-		// {
-		// 	_empty_sample_count++;
-		// 	break;
-		// }
-		// } while (t == 0.0 || t > 1); //(t > 0.0 && t < 1);
-
-		// even if _filter_conv_depth == 1, we are still taking random patches with a temporal depth.
 		Tensor<Time> input_time(Shape({_filter_width, _filter_height, _input_depth, _filter_conv_depth}));
 		for (size_t cx = 0; cx < _filter_height; cx++)
 		{

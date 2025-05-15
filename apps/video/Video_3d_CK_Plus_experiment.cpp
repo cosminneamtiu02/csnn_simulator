@@ -53,7 +53,7 @@ int main(int argc, char **argv)
     
     int num_folds = 10;
     
-    // Video frame dimensions
+    // Video frame dimensions - these are passed to the dataset loader
     size_t _frame_size_width = 48;
     size_t _frame_size_height = 48;
 
