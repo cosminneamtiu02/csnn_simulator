@@ -2,7 +2,8 @@
 #include "dataset/CK_Plus.h"
 #include "stdp/Multiplicative.h"
 #include "stdp/Biological.h"
-#include "layer/Convolution3D.h"
+
+#include "layer/FaceEllipseConvolution3D.h"
 #include "layer/Pooling.h"
 #include "Distribution.h"
 #include "execution/SparseIntermediateExecution.h"
@@ -157,9 +158,9 @@ int main(int argc, char **argv)
         float th_lr = 0.09f;
         float w_lr = 0.009f;
 
-        //volatile int debug_marker = 123;
-        auto &conv1 = experiment.push<layer::Convolution3D>(
-            _filter_width, _filter_height, _filter_depth, filter_number, "", 1, 1, tmp_stride);
+        // Update parameter order: filter_number, filter_width, filter_height, filter_depth
+        auto &conv1 = experiment.push<layer::FaceEllipseConvolution3D>(
+            filter_number, _filter_width, _filter_height, _filter_depth, "", 1, 1, tmp_stride);
             
         conv1.set_name("conv1");
         conv1.parameter<bool>("draw").set(false);
