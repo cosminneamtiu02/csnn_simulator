@@ -12,7 +12,6 @@
 #include "plot/Evolution.h"
 #include <thread> // std::this_thread::sleep_for
 #include <chrono>
-#include <cmath> // For M_PI and math functions
 
 namespace layer
 {
@@ -168,10 +167,6 @@ namespace layer
 		bool _wta_infer;
 
 		_priv::Convolution3DImpl _impl;
-
-		// Helper method for elliptical sampling
-		std::pair<size_t, size_t> sample_point_inside_ellipse(
-			size_t W, size_t H, size_t fw, size_t fh, std::default_random_engine& rng);
 	};
 
 } // namespace layer

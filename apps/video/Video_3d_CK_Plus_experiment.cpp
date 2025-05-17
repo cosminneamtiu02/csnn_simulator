@@ -2,7 +2,6 @@
 #include "dataset/CK_Plus.h"
 #include "stdp/Multiplicative.h"
 #include "stdp/Biological.h"
-
 #include "layer/FaceEllipseConvolution3D.h"
 #include "layer/Pooling.h"
 #include "Distribution.h"
@@ -54,7 +53,7 @@ int main(int argc, char **argv)
     
     int num_folds = 10;
     
-    // Video frame dimensions - these are passed to the dataset loader
+    // Video frame dimensions
     size_t _frame_size_width = 48;
     size_t _frame_size_height = 48;
 
@@ -158,9 +157,9 @@ int main(int argc, char **argv)
         float th_lr = 0.09f;
         float w_lr = 0.009f;
 
-        // Update parameter order: filter_number, filter_width, filter_height, filter_depth
+        //volatile int debug_marker = 123;
         auto &conv1 = experiment.push<layer::FaceEllipseConvolution3D>(
-            filter_number, _filter_width, _filter_height, _filter_depth, "", 1, 1, tmp_stride);
+            _filter_width, _filter_height, _filter_depth, filter_number, "", 1, 1, tmp_stride);
             
         conv1.set_name("conv1");
         conv1.parameter<bool>("draw").set(false);

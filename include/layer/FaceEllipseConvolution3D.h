@@ -70,7 +70,7 @@ namespace layer
 	} // namespace _priv
 
 	/**
-	 * @brief  FaceEllipseConvolution3D is a type of filtering applied on an input image, extracts certain features depending on a number of filters.
+	 * @brief FaceEllipseConvolution3D is a type of filtering applied on an input image, extracts certain features depending on a number of filters.
 	 * the features can be low level (curve, color, etc...) or more sophisticated features(eyes, nose, etc...)
 	 *
 	 * @param filter_width the width of the convolutional kernel
@@ -103,7 +103,7 @@ namespace layer
 		 *
 		 */
 		FaceEllipseConvolution3D(size_t filter_number, size_t filter_width, size_t filter_height, size_t filter_depth = 1, std::string model_path = "", size_t stride_x = 1,
-              size_t stride_y = 1, size_t stride_k = 1, size_t padding_x = 0, size_t padding_y = 0, size_t padding_k = 0);
+					  size_t stride_y = 1, size_t stride_k = 1, size_t padding_x = 0, size_t padding_y = 0, size_t padding_k = 0);
 
 		FaceEllipseConvolution3D(const FaceEllipseConvolution3D &that) = delete;
 		FaceEllipseConvolution3D &operator=(const FaceEllipseConvolution3D &that) = delete;
@@ -168,7 +168,7 @@ namespace layer
 		bool _wta_infer;
 
 		_priv::FaceEllipseConvolution3DImpl _impl;
-
+		
 		// Helper method for elliptical sampling
 		std::pair<size_t, size_t> sample_point_inside_ellipse(
 			size_t W, size_t H, size_t fw, size_t fh, std::default_random_engine& rng);

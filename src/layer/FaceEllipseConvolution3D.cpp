@@ -2,11 +2,11 @@
 #include "Experiment.h"
 #include <execution>
 #include <mutex>
+#include <cmath> // For M_PI and math functions
 
 using namespace layer;
 
 static RegisterClassParameter<FaceEllipseConvolution3D, LayerFactory> _register("FaceEllipseConvolution3D");
-
 /**
  * FaceEllipseConvolution3D is a type of filter applied on an input immage,
  * @param annealing used as a faactor ro update other paremeteers later
@@ -36,11 +36,11 @@ FaceEllipseConvolution3D::FaceEllipseConvolution3D() : Layer4D(_register),
 }
 
 FaceEllipseConvolution3D::FaceEllipseConvolution3D(size_t filter_number, size_t filter_width, size_t filter_height, size_t filter_depth, std::string model_path,
-                         size_t stride_x, size_t stride_y, size_t stride_k, size_t padding_x, size_t padding_y, size_t padding_k)
-    : Layer4D(_register, filter_number, filter_width, filter_height, filter_depth, stride_x, stride_y, stride_k, padding_x, padding_y, padding_k),
-      _inhibition(true), _model_path(model_path), _draw(false), _save_weights(false), _save_random_start(false), _log_spiking_neuron(false), _annealing(1.0),
-      _min_th(0), _t_obj(0), _lr_th(0), _sample_number(0), _sample_count(0), _spike_count(0), _drawn_weights(0), _saved_weights(0), _logged_spiking_neuron(0), _saved_random_start(0),
-      _w(), _th(), _stdp(nullptr), _input_depth(0), _impl(*this)
+							 size_t stride_x, size_t stride_y, size_t stride_k, size_t padding_x, size_t padding_y, size_t padding_k)
+	: Layer4D(_register, filter_number, filter_width, filter_height, filter_depth, stride_x, stride_y, stride_k, padding_x, padding_y, padding_k),
+	  _inhibition(true), _model_path(model_path), _draw(false), _save_weights(false), _save_random_start(false), _log_spiking_neuron(false), _annealing(1.0),
+	  _min_th(0), _t_obj(0), _lr_th(0), _sample_number(0), _sample_count(0), _spike_count(0), _drawn_weights(0), _saved_weights(0), _logged_spiking_neuron(0), _saved_random_start(0),
+	  _w(), _th(), _stdp(nullptr), _input_depth(0), _impl(*this)
 {
 	add_parameter("draw", _draw);
 	add_parameter("save_weights", _save_weights);
@@ -74,11 +74,6 @@ FaceEllipseConvolution3D::FaceEllipseConvolution3D(size_t filter_number, size_t 
 
 Shape FaceEllipseConvolution3D::compute_shape(const Shape &previous_shape)
 {
-    // Check filter dimensions before proceeding
-    if (_filter_width > previous_shape.dim(0) || _filter_height > previous_shape.dim(1)) {
-        throw std::runtime_error("Filter dimension need to be smaller than the input");
-    }
-    
 	Layer4D::compute_shape(previous_shape);
 
 	_input_depth = previous_shape.dim(2);
@@ -88,6 +83,7 @@ Shape FaceEllipseConvolution3D::compute_shape(const Shape &previous_shape)
 	parameter<Tensor<float>>("th").shape(_filter_number);
 
 	_impl.resize();
+	// TODO: _conv_depth or filter_depth here?
 	return Shape({_width, _height, _depth, _conv_depth});
 }
 
@@ -104,33 +100,23 @@ size_t FaceEllipseConvolution3D::train_pass_number() const
 
 /**
  * Helper function to sample a point inside an elliptical region of the image
- * @param W Image width
- * @param H Image height
- * @param fw Filter width
- * @param fh Filter height
- * @param rng Random number generator
- * @return Pair of x,y coordinates
  */
 std::pair<size_t, size_t> FaceEllipseConvolution3D::sample_point_inside_ellipse(
     size_t W, size_t H, size_t fw, size_t fh, std::default_random_engine& rng) 
 {
-    // Safety check - if filter is larger than input dimensions, return center
-    if (fw >= W || fh >= H) {
-        size_t x = std::max(0, static_cast<int>(W/2 - fw/2));
-        size_t y = std::max(0, static_cast<int>(H/2 - fh/2));
-        return {x, y};
-    }
+    // Define the ellipse parameters relative to image size
+    const double rx = 0.35;  // horizontal radius as fraction of width
+    const double ry = 0.45;  // vertical radius as fraction of height
 
-    const double rx = 0.35;
-    const double ry = 0.45;
-
+    // Center of the ellipse (center of the image)
     const double cx = W / 2.0;
     const double cy = H / 2.0;
 
+    // Ellipse dimensions
     const double a = rx * W;
     const double b = ry * H;
 
-    // Shrink to ensure filter stays inside
+    // Shrink the sampling region to ensure filter stays inside the image
     const double a_safe = a - fw / 2.0;
     const double b_safe = b - fh / 2.0;
 
@@ -138,28 +124,23 @@ std::pair<size_t, size_t> FaceEllipseConvolution3D::sample_point_inside_ellipse(
     std::uniform_real_distribution<double> dist_radius(0, 1);
 
     double x, y;
-    int safety_counter = 0;
-    while (safety_counter < 1000) {  // Add safety counter to prevent infinite loops
-        safety_counter++;
+    while (true) {
+        // Use polar coordinates for uniform sampling within ellipse
         double r = std::sqrt(dist_radius(rng));
         double theta = dist_angle(rng);
 
+        // Convert to Cartesian coordinates and scale by ellipse dimensions
         double dx = a_safe * r * std::cos(theta);
         double dy = b_safe * r * std::sin(theta);
 
+        // Compute final position, adjusting for filter size
         x = cx + dx - fw / 2.0;
         y = cy + dy - fh / 2.0;
 
-        // Make sure it's within image bounds
+        // Make sure the point is within image bounds
         if (x >= 0 && y >= 0 && x + fw <= W && y + fh <= H) {
             break;
         }
-    }
-    
-    // If we couldn't find a valid point, use center
-    if (safety_counter >= 1000) {
-        x = std::max(0, static_cast<int>(W/2 - fw/2));
-        y = std::max(0, static_cast<int>(H/2 - fh/2));
     }
 
     return {static_cast<size_t>(x), static_cast<size_t>(y)};
@@ -200,16 +181,20 @@ void FaceEllipseConvolution3D::process_train_sample(const std::string &label, Te
 		size_t z = 0;
 		size_t k = 0;
 		float t = 0.0;
+		// size_t _empty_sample_count = 0;
+		// bool _sample_contain_info = Tensor<float>::tensor_contain_info(sample);
 
-		// Replace uniform sampling with elliptical sampling
+		// do // take the random patches around places where a spike exists
+		// {
+
+        // Use elliptical sampling instead of uniform sampling
 		if (_filter_width < _width && _filter_height < _height)
 		{
-			auto [sample_x, sample_y] = sample_point_inside_ellipse(
-				_width, _height, _filter_width, _filter_height, experiment()->random_generator());
-			x = sample_x;
-			y = sample_y;
+		    auto [sample_x, sample_y] = sample_point_inside_ellipse(
+                _width, _height, _filter_width, _filter_height, experiment()->random_generator());
+            x = sample_x;
+            y = sample_y;
 		}
-
 		if (_filter_conv_depth < _conv_depth)
 		{
 			std::uniform_int_distribution<size_t> rand_y(0, _conv_depth - _filter_conv_depth);
@@ -220,6 +205,14 @@ void FaceEllipseConvolution3D::process_train_sample(const std::string &label, Te
 		z = rand_z(experiment()->random_generator());
 		t = sample.at(x, y, z, k);
 
+		// if (!_sample_contain_info)
+		// {
+		// 	_empty_sample_count++;
+		// 	break;
+		// }
+		// } while (t == 0.0 || t > 1); //(t > 0.0 && t < 1);
+
+		// even if _filter_conv_depth == 1, we are still taking random patches with a temporal depth.
 		Tensor<Time> input_time(Shape({_filter_width, _filter_height, _input_depth, _filter_conv_depth}));
 		for (size_t cx = 0; cx < _filter_height; cx++)
 		{
