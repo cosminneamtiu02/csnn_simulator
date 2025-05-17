@@ -104,40 +104,51 @@ size_t FaceElypsesCutout3D::train_pass_number() const
 std::pair<size_t, size_t> FaceElypsesCutout3D::sample_point_inside_ellipse(
     size_t W, size_t H, size_t fw, size_t fh, std::default_random_engine& rng) 
 {
-    // Define the ellipse parameters relative to image size
-    const double rx = 0.35;  // horizontal radius as fraction of width
-    const double ry = 0.45;  // vertical radius as fraction of height
+    // Uniform distribution to select one of the 4 ellipses
+    std::uniform_int_distribution<int> ellipse_picker(0, 3);
+    int chosen = ellipse_picker(rng);
 
-    // Center of the ellipse (center of the image)
-    const double cx = W / 2.0;
-    const double cy = H / 2.0;
+    // Ellipse parameters (cx, cy, rx, ry) as fractions of W and H
+    double cx_ratio, cy_ratio, rx_ratio, ry_ratio;
 
-    // Ellipse dimensions
-    const double a = rx * W;
-    const double b = ry * H;
+    if (chosen == 0) {  // Forehead
+        cx_ratio = 0.50; cy_ratio = 0.25;
+        rx_ratio = 0.42; ry_ratio = 0.10;
+    } else if (chosen == 1) {  // Left cheek
+        cx_ratio = 0.295; cy_ratio = 0.52;
+        rx_ratio = 0.19;  ry_ratio = 0.08;
+    } else if (chosen == 2) {  // Right cheek
+        cx_ratio = 0.715; cy_ratio = 0.52;
+        rx_ratio = 0.18;  ry_ratio = 0.08;
+    } else {  // Mouth
+        cx_ratio = 0.50; cy_ratio = 0.72;
+        rx_ratio = 0.33; ry_ratio = 0.11;
+    }
 
-    // Shrink the sampling region to ensure filter stays inside the image
-    const double a_safe = a - fw / 2.0;
-    const double b_safe = b - fh / 2.0;
+    // Convert relative values to pixel values
+    double cx = cx_ratio * W;
+    double cy = cy_ratio * H;
+    double a  = rx_ratio * W;
+    double b  = ry_ratio * H;
+
+    // Safe ellipse area to avoid filter going outside
+    double a_safe = a - fw / 2.0;
+    double b_safe = b - fh / 2.0;
 
     std::uniform_real_distribution<double> dist_angle(0, 2 * M_PI);
     std::uniform_real_distribution<double> dist_radius(0, 1);
 
     double x, y;
     while (true) {
-        // Use polar coordinates for uniform sampling within ellipse
         double r = std::sqrt(dist_radius(rng));
         double theta = dist_angle(rng);
 
-        // Convert to Cartesian coordinates and scale by ellipse dimensions
         double dx = a_safe * r * std::cos(theta);
         double dy = b_safe * r * std::sin(theta);
 
-        // Compute final position, adjusting for filter size
         x = cx + dx - fw / 2.0;
         y = cy + dy - fh / 2.0;
 
-        // Make sure the point is within image bounds
         if (x >= 0 && y >= 0 && x + fw <= W && y + fh <= H) {
             break;
         }
