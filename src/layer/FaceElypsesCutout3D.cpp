@@ -105,13 +105,13 @@ std::pair<size_t, size_t> FaceElypsesCutout3D::sample_point_inside_ellipse(
     size_t W, size_t H, size_t fw, size_t fh, std::default_random_engine& rng) 
 {
     // Uniform distribution to select one of the 4 ellipses
-    std::uniform_int_distribution<int> ellipse_picker(0, 3);
+    std::uniform_int_distribution<int> ellipse_picker(0, 5);
     int chosen = ellipse_picker(rng);
 
     // Ellipse parameters (cx, cy, rx, ry) as fractions of W and H
     double cx_ratio, cy_ratio, rx_ratio, ry_ratio;
 
-    if (chosen == 0) {  // Forehead
+    if (chosen == 0 || chosen == 4) {  // Forehead
         cx_ratio = 0.50; cy_ratio = 0.25;
         rx_ratio = 0.42; ry_ratio = 0.10;
     } else if (chosen == 1) {  // Left cheek
