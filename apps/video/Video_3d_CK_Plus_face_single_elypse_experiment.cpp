@@ -24,10 +24,10 @@
 int main(int argc, char **argv)
 {
     // Parse command line arguments with new parameters
-    size_t _filter_width = (argc > 1) ? atoi(argv[1]) : 5;
-    size_t _filter_height = (argc > 2) ? atoi(argv[2]) : 5;
+    size_t _filter_width = (argc > 1) ? atoi(argv[1]) : 7;
+    size_t _filter_height = (argc > 2) ? atoi(argv[2]) : 7;
     size_t _filter_depth = (argc > 3) ? atoi(argv[3]) : 3;
-    size_t _temporal_sum_pooling = (argc > 4) ? atoi(argv[4]) : 3;
+    size_t _temporal_sum_pooling = (argc > 4) ? atoi(argv[4]) : 4;
     
     // Keep epochs and threshold unchanged
     int _epochs = (argc > 5) ? atoi(argv[5]) : 800;
