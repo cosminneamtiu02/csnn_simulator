@@ -54,6 +54,7 @@ Tensor<float> TimeObjectiveOutput::process(const Tensor<Time>& in) {
 
 	size_t size = in.shape().product();
 	for(size_t i=0; i<size; i++) {
+		
 		Time t = in.at_index(i);
 
 		//V INVERSE
@@ -74,7 +75,7 @@ Tensor<float> TimeObjectiveOutput::process(const Tensor<Time>& in) {
 			double close=std::abs(1/2-cdp);
 			out.at_index(i) = 1-2*close;
 		}*/
-
+	
 	}
 
 	return out;
