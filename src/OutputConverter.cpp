@@ -52,30 +52,31 @@ TimeObjectiveOutput::TimeObjectiveOutput(Time t_obj, std::string exp_name, std::
 Tensor<float> TimeObjectiveOutput::process(const Tensor<Time>& in) {
 	Tensor<float> out(in.shape());
 
+	const double miu = _t_obj;      // center
+	const double sigma = 0.05;      // spread (adjust if needed)
+	const double inv_sqrt2 = 1.0 / 1.4142135623730951;
+
 	size_t size = in.shape().product();
-	for(size_t i=0; i<size; i++) {
-		
-		Time t = in.at_index(i);
+	for (size_t i = 0; i < size; i++) {
 
 		//V INVERSE
-		out.at_index(i) = t == INFINITE_TIME ? 0.0 : std::min<Time>(1.0, std::max<Time>(0.0, 1.0-(t-_t_obj)/(1.0-_t_obj)));
+		//out.at_index(i) = t == INFINITE_TIME ? 0.0 : std::min<Time>(1.0, std::max<Time>(0.0, 1.0-(t-_t_obj)/(1.0-_t_obj)));
 
 		//V THRESHOLD
 		//out.at_index(i) = t == INFINITE_TIME ? 0.0 : ((t>_t_obj+0.1 || t < _t_obj - 0.1) ? 0.0 : 1.0);
 
-		//V AROUND
-    		//cdp.append(1/2*(1+math.erf((v-miu)/(sigma*1.4142))))
-    		//closeness.append(np.abs(1/2-cdp[-1]))
-    		//importance.append(1-2*closeness[-1])
-		/*
-		if (t==INFINITE_TIME) {
-			out.at_index(i) = 0.0;
-		} else {
-			double cdp=1/2*(1+std::erf((t-_t_obj)/(sigma*1.4142)));
-			double close=std::abs(1/2-cdp);
-			out.at_index(i) = 1-2*close;
-		}*/
-	
+		Time t = in.at_index(i);
+		if (t == INFINITE_TIME) {
+			out.at_index(i) = 0.0f;
+			continue;
+		}
+
+		double z = (t - miu) / (sigma * 1.4142135623730951); // (t-miu)/(sigma*sqrt(2))
+		double cdp = 0.5 * (1.0 + std::erf(z));
+		double closeness = std::fabs(0.5 - cdp);
+		double importance = 1.0 - 2.0 * closeness; // already in [0,1]
+		if (importance < 0.0) importance = 0.0;   // numerical safety
+		out.at_index(i) = static_cast<float>(importance);
 	}
 
 	return out;
