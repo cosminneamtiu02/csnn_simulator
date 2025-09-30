@@ -43,15 +43,13 @@ int main(int argc, char **argv)
     std::cout << "Random seed: " << random_seed << std::endl;
     std::cout << "Spatial pooling: " << _spatial_pooling << std::endl;
     
-    // Get dataset paths from environment variables
-    const char* csv_path_ptr = std::getenv("CK_PLUS_CSV_PATH");
-    const char* images_dir_ptr = std::getenv("CK_PLUS_IMAGES_DIR");
+
     
     // Convert to std::string
     std::string csv_path(csv_path_ptr);
     std::string images_dir(images_dir_ptr);
     
-    int num_folds = 10;
+    int num_folds = 1;
     
     // Video frame dimensions
     size_t _frame_size_width = 48;
