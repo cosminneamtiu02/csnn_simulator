@@ -43,13 +43,28 @@ int main(int argc, char **argv)
     std::cout << "Random seed: " << random_seed << std::endl;
     std::cout << "Spatial pooling: " << _spatial_pooling << std::endl;
     
-
+    // Get dataset paths from environment variables
+    const char* csv_path_ptr = "/home/cosmin/proiecte/datasets/CK+_TIM10/CK+_emotion.csv";
+    const char* images_dir_ptr = "/home/cosmin/proiecte/datasets/CK+_TIM10";
+    
+    // Check if environment variables are set
+    if (!csv_path_ptr) {
+        std::cerr << "Error: Environment variable CK_PLUS_CSV_PATH not set" << std::endl;
+        std::cerr << "Please set it with: export CK_PLUS_CSV_PATH=/path/to/ck_plus_labels.csv" << std::endl;
+        return 1;
+    }
+    
+    if (!images_dir_ptr) {
+        std::cerr << "Error: Environment variable CK_PLUS_IMAGES_DIR not set" << std::endl;
+        std::cerr << "Please set it with: export CK_PLUS_IMAGES_DIR=/path/to/ck_plus_images/" << std::endl;
+        return 1;
+    }
     
     // Convert to std::string
     std::string csv_path(csv_path_ptr);
     std::string images_dir(images_dir_ptr);
     
-    int num_folds = 2;
+    int num_folds = 1;
     
     // Video frame dimensions
     size_t _frame_size_width = 48;
