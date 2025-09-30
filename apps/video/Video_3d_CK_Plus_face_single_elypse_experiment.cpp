@@ -44,8 +44,8 @@ int main(int argc, char **argv)
     std::cout << "Spatial pooling: " << _spatial_pooling << std::endl;
     
     // Get dataset paths from environment variables
-    const char* csv_path_ptr = "/home/cosmin/proiecte/datasets/CK+_TIM10/CK+_emotion.csv";
-    const char* images_dir_ptr = "/home/cosmin/proiecte/datasets/CK+_TIM10";
+    const char* csv_path_ptr = "/home/data_CK+/CK+_TIM10/CK+_emotion.csv";
+    const char* images_dir_ptr = "/root/data_CK+/CK+_TIM10";
     
     // Check if environment variables are set
     if (!csv_path_ptr) {
@@ -64,7 +64,7 @@ int main(int argc, char **argv)
     std::string csv_path(csv_path_ptr);
     std::string images_dir(images_dir_ptr);
     
-    int num_folds = 1;
+    int num_folds = 10;
     
     // Video frame dimensions
     size_t _frame_size_width = 48;
