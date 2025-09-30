@@ -49,7 +49,7 @@ int main(int argc, char **argv)
     std::string csv_path(csv_path_ptr);
     std::string images_dir(images_dir_ptr);
     
-    int num_folds = 1;
+    int num_folds = 2;
     
     // Video frame dimensions
     size_t _frame_size_width = 48;
