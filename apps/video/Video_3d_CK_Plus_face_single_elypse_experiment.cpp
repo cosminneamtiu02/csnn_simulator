@@ -20,6 +20,7 @@
 #include "process/LateFusion.h"
 #include "process/SeparateSign.h"
 #include "process/MaxScaling.h"
+#include <cstdlib> // std::getenv
 
 int main(int argc, char **argv)
 {
@@ -44,8 +45,8 @@ int main(int argc, char **argv)
     std::cout << "Spatial pooling: " << _spatial_pooling << std::endl;
     
     // Get dataset paths from environment variables
-    const char* csv_path_ptr = "/root/data_CK+/CK+_TIM10/CK+_emotion.csv";
-    const char* images_dir_ptr = "/root/data_CK+/CK+_TIM10";
+    const char* csv_path_ptr = std::getenv("CK_PLUS_CSV_PATH");
+    const char* images_dir_ptr = std::getenv("CK_PLUS_IMAGES_DIR");
     
     // Check if environment variables are set
     if (!csv_path_ptr) {
